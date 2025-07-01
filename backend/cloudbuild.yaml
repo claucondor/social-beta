@@ -33,9 +33,26 @@ steps:
       '--region', 'us-central1',
       '--platform', 'managed',
       '--allow-unauthenticated',
-      '--set-env-vars', 'GCP_PROJECT_ID=$PROJECT_ID',
-      '--set-env-vars', 'NODE_ENV=production',
-      '--set-env-vars', 'LOG_LEVEL=info'
+      
+      # --- Variables de Entorno (No Secretas) ---
+      '--set-env-vars', 
+        # Application Config
+        'NODE_ENV=production,'
+        'LOG_LEVEL=info,'
+        # Flow Config
+        'FLOW_ACCESS_NODE=https://rest-testnet.onflow.org,'
+        'FLOW_NETWORK=testnet,'
+        'FLOW_ORACLE_ADDRESS=0x2444e6b4d9327f09,'
+        # Google Cloud Config
+        'GCP_PROJECT_ID=$PROJECT_ID,'
+        'GCS_BUCKET_NAME=la-red-de-automatas-assets,'
+        # Database/Collection Config
+        'MESSAGE_QUEUE_COLLECTION=message_queue,'
+        'BONDS_COLLECTION=bonds,'
+        'USERS_COLLECTION=users',
+
+      # --- Secretos ---
+      '--update-secrets', 'FLOW_ORACLE_PRIVATE_KEY=FLOW_ORACLE_PRIVATE_KEY:latest'
     ]
 
 # Store images in Container Registry
