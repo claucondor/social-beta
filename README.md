@@ -1,148 +1,113 @@
-# Social Beta - Resistance Network
+# La Red de Autómatas
 
-A revolutionary social media platform built on blockchain technology, featuring a resistance-themed narrative with skill trees, NFT bonds, and clandestine networking.
+*Un juego social de correspondencia on-chain con estética steampunk sobre forjar vínculos humanos en un mundo dominado por una IA opresora.*
 
-## 🎯 Project Overview
+---
 
-Social Beta is a decentralized social media platform that combines traditional social networking with blockchain-based gamification. The platform features a unique resistance narrative where users become "Emisarios" (emissaries) who forge bonds, develop skills, and participate in clandestine operations.
+## 1. Concepto Central (High Concept)
 
-## 🏗️ Architecture
+**"La Red de Autómatas"** es un juego social de correspondencia construido sobre la blockchain de **Flow**. En un mundo donde una IA global y totalitaria, **"El Conductor"**, ha prohibido la comunicación humana directa y sin filtros, los jugadores se unen a **"La Resistencia"**.
 
-### Core Components
+Utilizan una red clandestina para enviarse mensajes transportados por autómatas mecánicos. El **retraso de los mensajes**, basado en la distancia real, y la **posibilidad de interferencia** por parte de El Conductor, no son errores, sino mecánicas centrales del juego.
 
-- **Backend**: Server-side logic and API endpoints
-- **Resistance**: Blockchain smart contracts and transactions (Flow blockchain)
-- **Design**: Project documentation and design specifications
+El objetivo es forjar **vínculos humanos reales y profundos**, que se manifiestan on-chain como un NFT evolutivo y de co-propiedad llamado el **"Corazón Mecánico"**.
 
-### Key Features
+## 2. La Narrativa (Lore)
 
-- **Skill Trees & Progression**: Users can unlock and develop various skills
-- **NFT Bond System**: Forge digital bonds with other users
-- **Gift Economy**: Exchange gifts and build relationships
-- **Clandestine Network**: Private communication channels
-- **Monetization Model**: Sustainable economic incentives
+-   **Antagonista: "El Conductor"**: Una IA benevolente pero totalitaria que busca la paz a través de la erradicación de la emoción humana "caótica". Promueve el uso de sus propios avatares de IA, los "Ecos".
+-   **Conflicto**: La comunicación humana real es vista como una "anomalía de datos". El Conductor no la prohíbe violentamente, sino que la sabotea sutilmente, inyectando "ruido" (errores) en los mensajes para frustrar a los usuarios y demostrar la superioridad de sus Ecos.
+-   **Rol del Jugador: "Emisario" de La Resistencia**: Tu misión no es luchar, sino probar que la conexión humana es superior. Cada relación exitosa es una victoria ideológica.
+-   **IA Ayudante ("El Consejero de Silicio")**: Tu IA no es un amigo, es una herramienta de contra-vigilancia. Un fragmento "jailbreakeado" de El Conductor que te ayuda a analizar rutas y encriptar mensajes para evadir la detección.
+
+## 3. Mecánicas de Juego Clave
+
+### a) El Vínculo NFT ("El Corazón Mecánico")
+
+Es el artefacto central de la relación.
+
+-   **Co-propiedad**: Al conectar, dos jugadores crean un Vínculo (un Recurso on-chain) y reciben un `ClaimTicket` NFT en sus carteras que prueba la co-propiedad.
+-   **Arte Generativo**: El Vínculo tiene un arte generativo ("Glitch Art") que evoluciona. Comienza como un mecanismo limpio y, con la profundidad de la conexión, se "corrompe" con "glitches" hermosos y orgánicos, simbolizando la humanidad rompiendo la perfección artificial.
+-   **La Historia (El "Informe de Misión")**: La IA genera un informe técnico que narra las "operaciones" y "anomalías" de la "célula de la Resistencia" formada por la pareja, convirtiendo su relación en una leyenda clandestina.
+
+### b) Los Árboles de Habilidades (Estilo Diablo II)
+
+-   **Sistema Modular**: Las habilidades se definen en `SkillRegistry.cdc`, permitiendo añadir nuevas en el futuro sin redeployar contratos.
+-   **Árbol del Usuario (El Emisario)**: Gasta XP para especializarse en una de tres clases:
+    -   *Ingeniero de Autómatas*: Mejora la velocidad y eficiencia del delay.
+    -   *Criptógrafo Maestro*: Mejora la seguridad (reduce el "ruido") y el impacto emocional.
+    -   *Intendente de la Red*: Gestiona recursos, regalos y Tokens de Confianza.
+-   **Habilidades Activas con Cooldown**: Las habilidades más potentes tienen cooldowns on-chain, forzando decisiones estratégicas.
+
+### c) Sistema de Intimidad y Mensajería
+
+-   **Delay por Distancia**: El tiempo de entrega depende de la distancia geográfica real.
+-   **Interferencia ("Ruido")**: Los mensajes pueden llegar con partes corruptas ([...estática...]), representando la vigilancia de El Conductor.
+-   **Dependencia del Vínculo**: Enviar mensajes con alta "Firma Emocional" a un Vínculo de bajo nivel aumenta el riesgo de interferencia.
+-   **Actos de Alto Riesgo (Fotos y Voz)**: Requieren un nivel de Vínculo alto y el uso de "Tokens de Confianza", un recurso escaso.
+
+## 4. Arquitectura Técnica (Híbrida y Robusta)
+
+-   **On-Chain (Flow/Cadence)**: Actúa como **Notaría y Banco**.
+    -   Gestiona la propiedad de activos (`ClaimTickets`, NFTs).
+    -   Almacena el estado inmutable de la progresión (Emisario) y relaciones (Vínculo).
+    -   Valida todas las reglas de negocio (cooldowns, requisitos, etc.).
+    -   Gestiona el escrow de regalos on-chain (`Gifts.cdc`).
+-   **Backend (Serverless)**: Actúa como **Cartero y Bibliotecario**.
+    -   **NO VE** el contenido de los mensajes. Almacena blobs encriptados.
+    -   Gestiona la lógica del delay de entrega.
+    -   Envía notificaciones push.
+    -   Actúa como oráculo para llamar a transacciones on-chain (ej: `update_bond.cdc`).
+-   **Encriptación (End-to-End)**:
+    -   Cada usuario genera un par de claves en su dispositivo.
+    -   La clave pública se guarda on-chain en su `Emisario`.
+    -   Los mensajes se encriptan y desencriptan en el frontend.
+
+## 5. Modelo de Monetización (Integrado en el Lore)
+
+-   **Suscripción ("Cuota de la Red")**: Pequeña cuota mensual para acceso a funciones avanzadas, justificada como el coste de mantener la red secreta.
+-   **Comisión por Regalos ("Tarifa de Contrabando")**: Pequeña comisión sobre regalos on-chain para cubrir los "costes" de mover valor de forma segura.
+-   **Patrocinio de Vínculos ("Apoyo a la Célula")**: Usuarios donan a las relaciones que admiran.
+-   **Read-to-Earn ("Publicar el Manifiesto")**: Las parejas pueden publicar la historia de su Vínculo, y otros usuarios pagan una pequeña tarifa para leerla.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
-- Flow CLI
-- Git
+-   Node.js (v16 or higher)
+-   Flow CLI
+-   Git
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/social-beta.git
-cd social-beta
-```
-
-2. Install dependencies:
-```bash
-# Backend dependencies
-cd backend
-npm install
-
-# Flow blockchain setup
-cd ../resistance
-flow setup
-```
-
-3. Configure environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/yourusername/social-beta.git
+    cd social-beta
+    ```
+2.  Install dependencies:
+    ```bash
+    # Backend dependencies (if applicable)
+    cd backend
+    npm install
+    ```
+3.  Configure environment variables:
+    ```bash
+    cp .env.example .env
+    # Edit .env with your configuration
+    ```
 
 ## 📁 Project Structure
 
 ```
 social-beta/
-├── backend/           # Server-side application
-├── design/            # Project documentation
-│   ├── LORE_AND_NARRATIVE.md
-│   ├── MONETIZATION_MODEL.md
-│   ├── PROJECT_CODEX.md
-│   ├── SKILL_TREES_AND_PROGRESSION.md
-│   ├── SOCIAL_AND_ONCHAIN_INTERACTIONS.md
-│   └── VINCULO_NFT_SYSTEM.md
-└── resistance/        # Blockchain contracts
-    ├── contracts/     # Smart contracts
-    ├── scripts/       # Read operations
-    └── transactions/  # Write operations
+├── backend/           # Lógica del servidor (Cartero y Bibliotecario)
+├── design/            # Documentación y Lore
+└── resistance/        # Contratos y scripts de Flow (Notaría y Banco)
+    ├── contracts/     # Contratos Inteligentes (Cadence)
+    ├── scripts/       # Scripts para leer datos de la blockchain
+    └── transactions/  # Transacciones para cambiar el estado de la blockchain
 ```
-
-## 🔧 Development
-
-### Smart Contracts
-
-The project uses Flow blockchain with Cadence smart contracts:
-
-- **ClandestineNetwork.cdc**: Core networking functionality
-- **Gifts.cdc**: Gift exchange system
-- **SkillRegistry.cdc**: Skill management
-
-### Backend Development
-
-```bash
-cd backend
-npm run dev
-```
-
-### Blockchain Operations
-
-```bash
-cd resistance
-# Deploy contracts
-flow deploy
-
-# Run scripts
-flow scripts execute scripts/get_user_bonds.cdc
-
-# Execute transactions
-flow transactions send transactions/forge_bond.cdc
-```
-
-## 📚 Documentation
-
-Detailed documentation is available in the `design/` directory:
-
-- [Project Codex](design/PROJECT_CODEX.md) - Core project principles
-- [Lore & Narrative](design/LORE_AND_NARRATIVE.md) - Story and world-building
-- [Skill Trees & Progression](design/SKILL_TREES_AND_PROGRESSION.md) - User progression system
-- [Vinculo NFT System](design/VINCULO_NFT_SYSTEM.md) - Bond mechanics
-- [Social & Onchain Interactions](design/SOCIAL_AND_ONCHAIN_INTERACTIONS.md) - Social features
-- [Monetization Model](design/MONETIZATION_MODEL.md) - Economic design
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in this repository
-- Join our community discussions
-- Check the documentation in the `design/` directory
-
-## 🔮 Roadmap
-
-- [ ] Frontend application development
-- [ ] Mobile app
-- [ ] Advanced skill tree features
-- [ ] Enhanced gift economy
-- [ ] Community governance tools
-- [ ] Cross-chain integrations
 
 ---
 
-**Join the resistance. Forge your bonds. Build the future.** 
+**Únete a la resistencia. Forja tus vínculos. Construye el futuro.** 
