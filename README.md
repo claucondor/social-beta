@@ -1,113 +1,273 @@
-# La Red de Autómatas
+# La Red de Autómatas - Backend
 
-*Un juego social de correspondencia on-chain con estética steampunk sobre forjar vínculos humanos en un mundo dominado por una IA opresora.*
+Backend modular, seguro y escalable para el juego social on-chain "La Red de Autómatas". Desarrollado con Node.js, TypeScript, Hono y completamente containerizado para Google Cloud Run.
+
+## 🏗️ Arquitectura
+
+El backend actúa como el "operador logístico" de la red clandestina, gestionando:
+
+- **Comunicación off-chain**: Sistema de mensajería con delays programables
+- **Lógica de juego**: Procesamiento de eventos y evolución de Bonds NFT
+- **Orquestación on-chain**: Interacción con contratos de Flow blockchain
+- **Generación de contenido**: Informes de misión e imágenes SVG con IA
+
+## 🛠️ Stack Tecnológico
+
+- **Runtime**: Node.js 18+ con TypeScript
+- **Framework Web**: Hono (ultra-rápido y compatible con Cloud Run)
+- **Base de Datos**: Google Firestore (serverless, sin configuración)
+- **Blockchain**: Flow FCL para interacciones on-chain
+- **IA**: Google Vertex AI (Gemini para texto e imágenes)
+- **Storage**: Google Cloud Storage para assets
+- **Containerización**: Docker multi-stage optimizado
+- **Despliegue**: Google Cloud Run con autenticación automática
+
+## 📁 Estructura del Proyecto
+
+```
+src/
+├── config/           # Configuración y variables de entorno
+│   └── index.ts      # Config centralizada con validación Zod
+├── services/         # Lógica de negocio principal
+│   ├── flow.service.ts     # Interacciones con Flow blockchain
+│   ├── message.service.ts  # Cola de mensajes con Firestore
+│   ├── ia.service.ts       # Generación de contenido con Vertex AI
+│   └── scheduler.service.ts # Tareas programadas y mantenimiento
+├── api/              # Rutas y controladores HTTP
+│   └── routes.ts     # Endpoints REST con Hono
+├── types/            # Definiciones de tipos TypeScript
+│   └── index.ts      # Interfaces y tipos compartidos
+└── index.ts          # Punto de entrada de la aplicación
+```
+
+## 🚀 Inicio Rápido
+
+### Prerrequisitos
+
+- Node.js 18+
+- Docker (para containerización)
+- Cuenta de Google Cloud Platform
+- Cuenta de Flow (testnet/mainnet)
+
+### Instalación Local
+
+1. **Clonar el repositorio**
+   ```bash
+   git clone <repository-url>
+   cd la-red-de-automatas-backend
+   ```
+
+2. **Instalar dependencias**
+   ```bash
+   npm install
+   ```
+
+3. **Configurar variables de entorno**
+   ```bash
+   cp .env.example .env
+   # Editar .env con tus valores específicos
+   ```
+
+4. **Ejecutar en desarrollo**
+   ```bash
+   npm run dev
+   ```
+
+5. **Construir para producción**
+   ```bash
+   npm run build
+   npm start
+   ```
+
+### Configuración de Variables de Entorno
+
+```bash
+# Google Cloud Platform
+GCP_PROJECT_ID=tu-proyecto-gcp
+
+# Flow Blockchain
+FLOW_ACCESS_NODE=https://rest-testnet.onflow.org
+FLOW_NETWORK=testnet
+FLOW_ORACLE_ADDRESS=0x1234567890abcdef
+FLOW_ORACLE_PRIVATE_KEY=tu-clave-privada-flow
+
+# Cloud Storage
+GCS_BUCKET_NAME=la-red-de-automatas-assets
+
+# Configuración de aplicación
+NODE_ENV=production
+LOG_LEVEL=info
+```
+
+## 🐳 Containerización y Despliegue
+
+### Build Docker Local
+
+```bash
+docker build -t la-red-de-automatas-backend .
+docker run -p 8080:8080 --env-file .env la-red-de-automatas-backend
+```
+
+### Despliegue en Google Cloud Run
+
+```bash
+# Configurar gcloud CLI
+gcloud config set project TU_PROYECTO_GCP
+
+# Build y push a Container Registry
+gcloud builds submit --tag gcr.io/TU_PROYECTO_GCP/la-red-de-automatas-backend
+
+# Desplegar en Cloud Run
+gcloud run deploy la-red-de-automatas-backend \
+  --image gcr.io/TU_PROYECTO_GCP/la-red-de-automatas-backend \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars GCP_PROJECT_ID=TU_PROYECTO_GCP \
+  --set-env-vars FLOW_NETWORK=testnet \
+  --set-env-vars GCS_BUCKET_NAME=tu-bucket
+```
+
+## 📚 API Documentation
+
+### Endpoints Principales
+
+#### Salud del Sistema
+- `GET /health` - Health check
+- `GET /api/system/stats` - Estadísticas del sistema
+
+#### Mensajería
+- `POST /api/messages` - Crear mensaje con delay
+- `GET /api/messages/:address` - Obtener mensajes de una dirección
+- `GET /api/messages/stats` - Estadísticas de la cola
+
+#### Scheduler (Cloud Scheduler)
+- `POST /api/scheduler/process-queue` - Procesar cola de mensajes
+- `POST /api/scheduler/process-bonds` - Procesar evoluciones de bonds
+- `POST /api/scheduler/maintenance` - Ejecutar tareas de mantenimiento
+
+#### Flow Blockchain
+- `GET /api/bonds/:bondId` - Información de un Bond NFT
+- `POST /api/bonds/:bondId/grant-xp` - Otorgar XP a usuario
+- `GET /api/transactions/:txId/status` - Estado de transacción
+
+#### Inteligencia Artificial
+- `POST /api/ai/generate-report` - Generar informe de misión
+- `POST /api/ai/generate-art` - Generar arte SVG
+- `POST /api/ai/process-evolution/:bondId` - Procesar evolución completa
+
+### Ejemplo de Uso
+
+```javascript
+// Crear mensaje con delay de 30 minutos
+const response = await fetch('/api/messages', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    recipientAddress: '0x1234567890abcdef',
+    encryptedContent: 'mensaje_cifrado_base64',
+    delayMinutes: 30
+  })
+});
+
+// Generar arte para Bond
+const artResponse = await fetch('/api/ai/generate-art', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    artSeed: ['mystery', 'connection', 'digital'],
+    bondLevel: 3
+  })
+});
+```
+
+## ⚙️ Configuración de Cloud Scheduler
+
+Para automatizar el procesamiento de mensajes:
+
+```bash
+# Crear job para procesar cola de mensajes cada minuto
+gcloud scheduler jobs create http process-message-queue \
+  --schedule="* * * * *" \
+  --uri="https://tu-backend-url/api/scheduler/process-queue" \
+  --http-method=POST \
+  --headers="Content-Type=application/json"
+
+# Crear job para mantenimiento diario
+gcloud scheduler jobs create http daily-maintenance \
+  --schedule="0 2 * * *" \
+  --uri="https://tu-backend-url/api/scheduler/maintenance" \
+  --http-method=POST \
+  --headers="Content-Type=application/json"
+```
+
+## 🔒 Seguridad
+
+- **Autenticación automática**: GCP Service Account para Firestore/Vertex AI
+- **Secrets Management**: Google Secret Manager para claves privadas
+- **CORS configurado**: Para permitir acceso desde frontend autorizado
+- **Validación de input**: Zod para validación robusta de datos
+- **Rate limiting**: Implementado a través de Cloud Run concurrency
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests
+npm test
+
+# Linting
+npm run lint
+npm run lint:fix
+```
+
+## 📈 Monitoreo y Logs
+
+Cloud Run proporciona métricas automáticas:
+- **Request latency**
+- **Request count**
+- **Error rate**
+- **Memory usage**
+- **CPU utilization**
+
+Logs disponibles en Google Cloud Logging.
+
+## 🔧 Desarrollo
+
+### Scripts Disponibles
+
+- `npm run dev` - Desarrollo con hot reload
+- `npm run build` - Build para producción
+- `npm start` - Ejecutar versión compilada
+- `npm test` - Ejecutar tests
+- `npm run lint` - Verificar código con ESLint
+
+### Añadir Nuevas Funcionalidades
+
+1. Definir tipos en `src/types/index.ts`
+2. Implementar lógica en `src/services/`
+3. Crear endpoints en `src/api/routes.ts`
+4. Actualizar tests correspondientes
+
+## 🤝 Contribución
+
+1. Fork el repositorio
+2. Crear feature branch (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit cambios (`git commit -am 'Añadir nueva funcionalidad'`)
+4. Push al branch (`git push origin feature/nueva-funcionalidad`)
+5. Crear Pull Request
+
+## 📄 Licencia
+
+MIT License - ver archivo LICENSE para más detalles.
+
+## 🆘 Soporte
+
+Para problemas y preguntas:
+- Crear issue en GitHub
+- Revisar logs de Cloud Run
+- Verificar configuración de variables de entorno
+- Consultar documentación de GCP/Flow
 
 ---
 
-## 1. Concepto Central (High Concept)
-
-**"La Red de Autómatas"** es un juego social de correspondencia construido sobre la blockchain de **Flow**. En un mundo donde una IA global y totalitaria, **"El Conductor"**, ha prohibido la comunicación humana directa y sin filtros, los jugadores se unen a **"La Resistencia"**.
-
-Utilizan una red clandestina para enviarse mensajes transportados por autómatas mecánicos. El **retraso de los mensajes**, basado en la distancia real, y la **posibilidad de interferencia** por parte de El Conductor, no son errores, sino mecánicas centrales del juego.
-
-El objetivo es forjar **vínculos humanos reales y profundos**, que se manifiestan on-chain como un NFT evolutivo y de co-propiedad llamado el **"Corazón Mecánico"**.
-
-## 2. La Narrativa (Lore)
-
--   **Antagonista: "El Conductor"**: Una IA benevolente pero totalitaria que busca la paz a través de la erradicación de la emoción humana "caótica". Promueve el uso de sus propios avatares de IA, los "Ecos".
--   **Conflicto**: La comunicación humana real es vista como una "anomalía de datos". El Conductor no la prohíbe violentamente, sino que la sabotea sutilmente, inyectando "ruido" (errores) en los mensajes para frustrar a los usuarios y demostrar la superioridad de sus Ecos.
--   **Rol del Jugador: "Emisario" de La Resistencia**: Tu misión no es luchar, sino probar que la conexión humana es superior. Cada relación exitosa es una victoria ideológica.
--   **IA Ayudante ("El Consejero de Silicio")**: Tu IA no es un amigo, es una herramienta de contra-vigilancia. Un fragmento "jailbreakeado" de El Conductor que te ayuda a analizar rutas y encriptar mensajes para evadir la detección.
-
-## 3. Mecánicas de Juego Clave
-
-### a) El Vínculo NFT ("El Corazón Mecánico")
-
-Es el artefacto central de la relación.
-
--   **Co-propiedad**: Al conectar, dos jugadores crean un Vínculo (un Recurso on-chain) y reciben un `ClaimTicket` NFT en sus carteras que prueba la co-propiedad.
--   **Arte Generativo**: El Vínculo tiene un arte generativo ("Glitch Art") que evoluciona. Comienza como un mecanismo limpio y, con la profundidad de la conexión, se "corrompe" con "glitches" hermosos y orgánicos, simbolizando la humanidad rompiendo la perfección artificial.
--   **La Historia (El "Informe de Misión")**: La IA genera un informe técnico que narra las "operaciones" y "anomalías" de la "célula de la Resistencia" formada por la pareja, convirtiendo su relación en una leyenda clandestina.
-
-### b) Los Árboles de Habilidades (Estilo Diablo II)
-
--   **Sistema Modular**: Las habilidades se definen en `SkillRegistry.cdc`, permitiendo añadir nuevas en el futuro sin redeployar contratos.
--   **Árbol del Usuario (El Emisario)**: Gasta XP para especializarse en una de tres clases:
-    -   *Ingeniero de Autómatas*: Mejora la velocidad y eficiencia del delay.
-    -   *Criptógrafo Maestro*: Mejora la seguridad (reduce el "ruido") y el impacto emocional.
-    -   *Intendente de la Red*: Gestiona recursos, regalos y Tokens de Confianza.
--   **Habilidades Activas con Cooldown**: Las habilidades más potentes tienen cooldowns on-chain, forzando decisiones estratégicas.
-
-### c) Sistema de Intimidad y Mensajería
-
--   **Delay por Distancia**: El tiempo de entrega depende de la distancia geográfica real.
--   **Interferencia ("Ruido")**: Los mensajes pueden llegar con partes corruptas ([...estática...]), representando la vigilancia de El Conductor.
--   **Dependencia del Vínculo**: Enviar mensajes con alta "Firma Emocional" a un Vínculo de bajo nivel aumenta el riesgo de interferencia.
--   **Actos de Alto Riesgo (Fotos y Voz)**: Requieren un nivel de Vínculo alto y el uso de "Tokens de Confianza", un recurso escaso.
-
-## 4. Arquitectura Técnica (Híbrida y Robusta)
-
--   **On-Chain (Flow/Cadence)**: Actúa como **Notaría y Banco**.
-    -   Gestiona la propiedad de activos (`ClaimTickets`, NFTs).
-    -   Almacena el estado inmutable de la progresión (Emisario) y relaciones (Vínculo).
-    -   Valida todas las reglas de negocio (cooldowns, requisitos, etc.).
-    -   Gestiona el escrow de regalos on-chain (`Gifts.cdc`).
--   **Backend (Serverless)**: Actúa como **Cartero y Bibliotecario**.
-    -   **NO VE** el contenido de los mensajes. Almacena blobs encriptados.
-    -   Gestiona la lógica del delay de entrega.
-    -   Envía notificaciones push.
-    -   Actúa como oráculo para llamar a transacciones on-chain (ej: `update_bond.cdc`).
--   **Encriptación (End-to-End)**:
-    -   Cada usuario genera un par de claves en su dispositivo.
-    -   La clave pública se guarda on-chain en su `Emisario`.
-    -   Los mensajes se encriptan y desencriptan en el frontend.
-
-## 5. Modelo de Monetización (Integrado en el Lore)
-
--   **Suscripción ("Cuota de la Red")**: Pequeña cuota mensual para acceso a funciones avanzadas, justificada como el coste de mantener la red secreta.
--   **Comisión por Regalos ("Tarifa de Contrabando")**: Pequeña comisión sobre regalos on-chain para cubrir los "costes" de mover valor de forma segura.
--   **Patrocinio de Vínculos ("Apoyo a la Célula")**: Usuarios donan a las relaciones que admiran.
--   **Read-to-Earn ("Publicar el Manifiesto")**: Las parejas pueden publicar la historia de su Vínculo, y otros usuarios pagan una pequeña tarifa para leerla.
-
-## 🚀 Getting Started
-
-### Prerequisites
-
--   Node.js (v16 or higher)
--   Flow CLI
--   Git
-
-### Installation
-
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/yourusername/social-beta.git
-    cd social-beta
-    ```
-2.  Install dependencies:
-    ```bash
-    # Backend dependencies (if applicable)
-    cd backend
-    npm install
-    ```
-3.  Configure environment variables:
-    ```bash
-    cp .env.example .env
-    # Edit .env with your configuration
-    ```
-
-## 📁 Project Structure
-
-```
-social-beta/
-├── backend/           # Lógica del servidor (Cartero y Bibliotecario)
-├── design/            # Documentación y Lore
-└── resistance/        # Contratos y scripts de Flow (Notaría y Banco)
-    ├── contracts/     # Contratos Inteligentes (Cadence)
-    ├── scripts/       # Scripts para leer datos de la blockchain
-    └── transactions/  # Transacciones para cambiar el estado de la blockchain
-```
-
----
-
-**Únete a la resistencia. Forja tus vínculos. Construye el futuro.** 
+**La Red de Autómatas** - Conectando almas en la resistencia digital 🔗💙 
