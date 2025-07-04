@@ -11,7 +11,7 @@ access(all) fun main(userAddress: Address): [{String: AnyStruct}] {
     let result: [{String: AnyStruct}] = []
     
     // Get the public capability for the user's ClaimTicket Collection.
-    let collectionCap = getAccount(userAddress).capabilities.get<&{NonFungibleToken.CollectionPublic}>(ClandestineNetwork.ClaimCollectionPublicPath)
+    let collectionCap = getAccount(userAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
 
     if !collectionCap.check() {
         // If the capability doesn't exist or is invalid, return an empty array.

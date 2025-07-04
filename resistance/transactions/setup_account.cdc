@@ -32,7 +32,7 @@ transaction {
             signer.storage.save(<-collection, to: ClandestineNetwork.ClaimCollectionStoragePath)
 
             // Create a public capability for the collection.
-            let cap = signer.capabilities.storage.issue<&{NonFungibleToken.CollectionPublic}>(ClandestineNetwork.ClaimCollectionStoragePath)
+            let cap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionStoragePath)
             signer.capabilities.publish(cap, at: ClandestineNetwork.ClaimCollectionPublicPath)
             
             log("ClaimTicket NFT Collection created and capability published.")

@@ -207,6 +207,38 @@ access(all) contract ClandestineNetwork {
         return <- [<-claim1, <-claim2]
     }
     
+    // Simplified version for MVP that doesn't require partner's Emisario reference
+    access(all) fun forgeBondSimple(emisario1: &Emisario, owner1: Address, owner2: Address): @[ClaimTicket] {
+        self.totalBonds = self.totalBonds + 1
+        let bondID = self.totalBonds
+        
+        // Create a temporary placeholder Emisario for the partner
+        let tempEmisario <- create Emisario(id: 999999) // Placeholder ID
+        
+        // Create bond using original constructor
+        let newBond <- create Vinculo(
+            id: bondID,
+            emisario1: emisario1,
+            emisario2: &tempEmisario as &Emisario,
+            owner1: owner1,
+            owner2: owner2
+        )
+
+        let vaultRef = self.account.storage.borrow<auth(Mutate) &BondVault>(from: /storage/ClandestineBondVault)
+            ?? panic("BondVault not found!")
+        vaultRef.add(bond: <-newBond)
+
+        let claim1 <- create ClaimTicket(bondID: bondID, ownerAddress: owner1)
+        let claim2 <- create ClaimTicket(bondID: bondID, ownerAddress: owner2)
+
+        emit BondForged(bondID: bondID, emisario1ID: emisario1.id, emisario2ID: tempEmisario.id)
+
+        // Clean up the temporary Emisario
+        destroy tempEmisario
+
+        return <- [<-claim1, <-claim2]
+    }
+    
     access(all) view fun borrowVinculo(id: UInt64): &Vinculo? {
         let vaultRef = self.account.storage.borrow<&BondVault>(from: /storage/ClandestineBondVault)
             ?? panic("BondVault not found!")

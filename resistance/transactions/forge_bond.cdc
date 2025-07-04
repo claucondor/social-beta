@@ -18,10 +18,6 @@ transaction(partnerAddress: Address) {
     // The public capability to the partner's ClaimTicket Collection
     let partnerCollectionCap: Capability<&{NonFungibleToken.Collection}>
 
-    // A placeholder for the partner's Emisario resource.
-    // In a real implementation, this would be fetched via a public capability.
-    let partnerEmisario: @ClandestineNetwork.Emisario
-
     prepare(initiator: auth(Storage, Capabilities) &Account) {
         // --- Initiator Setup ---
         self.initiatorEmisarioRef = initiator.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
@@ -36,18 +32,12 @@ transaction(partnerAddress: Address) {
         if !self.partnerCollectionCap.check() {
             panic("Partner's ClaimTicket Collection capability is not valid or has not been published.")
         }
-
-        // --- Partner Emisario (MVP Placeholder) ---
-        // In a full implementation, we'd use a public capability to read the partner's
-        // Emisario ID. For now, we create a temporary one to satisfy the function signature.
-        self.partnerEmisario <- ClandestineNetwork.createEmisario()
     }
 
     execute {
-        // --- Forge the Bond and get the two Claim Tickets ---
-        let tickets <- ClandestineNetwork.forgeBond(
+        // --- Forge the Bond using the simplified version ---
+        let tickets <- ClandestineNetwork.forgeBondSimple(
             emisario1: self.initiatorEmisarioRef,
-            emisario2: self.partnerEmisario,
             owner1: self.initiatorEmisarioRef.owner!.address,
             owner2: partnerAddress
         )
@@ -69,7 +59,6 @@ transaction(partnerAddress: Address) {
         // The array should be empty now
         destroy tickets
         
-        // Clean up the placeholder resource
-        destroy self.partnerEmisario
+        log("Bond forged successfully!")
     }
 } 

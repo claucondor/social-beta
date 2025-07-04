@@ -13,17 +13,16 @@ transaction(recipientAddress: Address, xpToGrant: UFix64) {
     let emisarioRef: &ClandestineNetwork.Emisario
 
     prepare(admin: auth(Storage) &Account) {
-        // This transaction is authorized by an admin/oracle account, not the user.
-        // This is a common pattern for game progression to prevent cheating.
-        // We borrow the admin's capabilities to access and modify other accounts' resources.
+        // For the MVP, this transaction must be signed by the recipient themselves
+        // In production, this would be called by a trusted oracle with proper capabilities
         
-        // For the MVP, we assume the signer *is* the recipient for simplicity.
-        // In production, this would use admin capabilities.
+        // Check if the admin is granting XP to themselves (MVP approach)
+        if admin.address != recipientAddress {
+            panic("For MVP: Users must grant XP to themselves. Production version would use oracle capabilities.")
+        }
         
-        let recipientAccount = getAccount(recipientAddress)
-        
-        self.emisarioRef = recipientAccount.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-            ?? panic("Recipient's Emisario resource not found. They must run setup_account.cdc")
+        self.emisarioRef = admin.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+            ?? panic("Emisario resource not found. Please run setup_account.cdc first")
     }
 
     execute {

@@ -17,10 +17,10 @@ transaction(bondID: UInt64, pointsToAdd: UFix64) {
         // This transaction must be signed by an account with access to the BondVault,
         // typically the contract's admin account.
         
-        let vaultRef = admin.storage.borrow<&ClandestineNetwork.BondVault>(from: /storage/ClandestineBondVault)
+        let vaultRef = admin.storage.borrow<auth(Mutate) &ClandestineNetwork.BondVault>(from: /storage/ClandestineBondVault)
             ?? panic("Could not borrow a reference to the BondVault")
             
-        self.bondRef = vaultRef.borrowVinculo(id: bondID)
+        self.bondRef = vaultRef.bonds[bondID]
             ?? panic("Bond with the specified ID not found in the vault")
     }
 
