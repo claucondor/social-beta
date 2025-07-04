@@ -103,27 +103,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
           
-          // Subscribe to FCL current user
-          fcl.currentUser.subscribe((user: any) => {
-            if (user.loggedIn) {
-              const userData: User = {
-                addr: user.addr,
-                cid: user.cid,
-                loggedIn: true,
-              };
-              
-              set({ 
-                user: userData,
-                isAuthenticated: true,
-                isLoading: false,
-              });
-            } else {
-              set({ 
-                user: null,
-                isAuthenticated: false,
-                isLoading: false,
-              });
-            }
+          // Simple initialization - just set loading to false
+          // FCL will handle auth state changes via the login/logout methods
+          set({ 
+            isLoading: false,
           });
         } catch (error) {
           console.error('Initialize auth error:', error);

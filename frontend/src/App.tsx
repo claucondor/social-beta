@@ -1,109 +1,138 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
-import { useAuthStore } from './store/authStore';
-import { useGameStore } from './store/gameStore';
-
-// Pages
-import WelcomePage from './pages/WelcomePage';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import MessagesPage from './pages/MessagesPage';
-import ProfilePage from './pages/ProfilePage';
-import SkillTreePage from './pages/SkillTreePage';
-import VinculoPage from './pages/VinculoPage';
-import LibraryPage from './pages/LibraryPage';
-
-// Components
-import Layout from './components/Layout';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import MatrixRain from './components/MatrixRain';
-import LoadingScreen from './components/LoadingScreen';
-import AuthGuard from './components/AuthGuard';
+import ParticleField from './components/ParticleField';
+import WelcomePage from './pages/WelcomePage';
+import DashboardPage from './pages/DashboardPage';
+import { useAuthStore } from './stores/authStore';
 
-// Hooks
-import { useEffect } from 'react';
+// Placeholder components for routes
+const MessagesPage = () => (
+  <div className="min-h-screen bg-matrix-dark text-matrix-green flex items-center justify-center">
+    <div className="text-center">
+      <h1 className="text-4xl font-orbitron mb-4">Correspondencia</h1>
+      <p className="opacity-70">Sistema de mensajería con delay - Próximamente</p>
+    </div>
+  </div>
+);
+
+const BondsPage = () => (
+  <div className="min-h-screen bg-matrix-dark text-matrix-green flex items-center justify-center">
+    <div className="text-center">
+      <h1 className="text-4xl font-orbitron mb-4">Vínculos</h1>
+      <p className="opacity-70">Corazones Clandestinos NFT - Próximamente</p>
+    </div>
+  </div>
+);
+
+const SkillsPage = () => (
+  <div className="min-h-screen bg-matrix-dark text-matrix-green flex items-center justify-center">
+    <div className="text-center">
+      <h1 className="text-4xl font-orbitron mb-4">Habilidades</h1>
+      <p className="opacity-70">Árbol de Habilidades de Emisario - Próximamente</p>
+    </div>
+  </div>
+);
+
+const GiftsPage = () => (
+  <div className="min-h-screen bg-matrix-dark text-matrix-green flex items-center justify-center">
+    <div className="text-center">
+      <h1 className="text-4xl font-orbitron mb-4">Regalos</h1>
+      <p className="opacity-70">Sistema de Regalos On-Chain - Próximamente</p>
+    </div>
+  </div>
+);
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isInitialized } = useAuthStore();
+  
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-matrix-dark flex items-center justify-center">
+        <div className="text-matrix-green text-xl">Inicializando...</div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
 function App() {
-  const { isAuthenticated, isLoading, initializeAuth } = useAuthStore();
-  const { initializeGame } = useGameStore();
+  const { initialize } = useAuthStore();
 
   useEffect(() => {
-    initializeAuth();
-    initializeGame();
-  }, [initializeAuth, initializeGame]);
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
+    initialize();
+  }, [initialize]);
 
   return (
-    <div className="min-h-screen bg-dark-950 text-glitch-primary font-mono overflow-hidden">
-      <MatrixRain />
-      
-      <AnimatePresence mode="wait">
+    <div className="min-h-screen bg-matrix-dark relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 z-0">
+        <MatrixRain />
+        <ParticleField />
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<WelcomePage />} />
-          <Route path="/login" element={<LoginPage />} />
           
           {/* Protected Routes */}
-          <Route path="/dashboard" element={
-            <AuthGuard>
-              <Layout>
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
                 <DashboardPage />
-              </Layout>
-            </AuthGuard>
-          } />
+              </ProtectedRoute>
+            } 
+          />
           
-          <Route path="/messages" element={
-            <AuthGuard>
-              <Layout>
+          <Route 
+            path="/messages" 
+            element={
+              <ProtectedRoute>
                 <MessagesPage />
-              </Layout>
-            </AuthGuard>
-          } />
+              </ProtectedRoute>
+            } 
+          />
           
-          <Route path="/messages/:vinculoId" element={
-            <AuthGuard>
-              <Layout>
-                <MessagesPage />
-              </Layout>
-            </AuthGuard>
-          } />
+          <Route 
+            path="/bonds" 
+            element={
+              <ProtectedRoute>
+                <BondsPage />
+              </ProtectedRoute>
+            } 
+          />
           
-          <Route path="/profile" element={
-            <AuthGuard>
-              <Layout>
-                <ProfilePage />
-              </Layout>
-            </AuthGuard>
-          } />
+          <Route 
+            path="/skills" 
+            element={
+              <ProtectedRoute>
+                <SkillsPage />
+              </ProtectedRoute>
+            } 
+          />
           
-          <Route path="/skills" element={
-            <AuthGuard>
-              <Layout>
-                <SkillTreePage />
-              </Layout>
-            </AuthGuard>
-          } />
-          
-          <Route path="/vinculo/:vinculoId" element={
-            <AuthGuard>
-              <Layout>
-                <VinculoPage />
-              </Layout>
-            </AuthGuard>
-          } />
-          
-          <Route path="/library" element={
-            <AuthGuard>
-              <Layout>
-                <LibraryPage />
-              </Layout>
-            </AuthGuard>
-          } />
+          <Route 
+            path="/gifts" 
+            element={
+              <ProtectedRoute>
+                <GiftsPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Catch-all route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AnimatePresence>
+      </div>
     </div>
   );
 }

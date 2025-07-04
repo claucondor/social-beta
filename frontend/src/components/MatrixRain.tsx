@@ -19,59 +19,97 @@ const MatrixRain: React.FC = () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Matrix characters (mix of letters, numbers, and resistance symbols)
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ΨΦΩΛΔΣΞΠΘΓαβγδεζηθικλμνξοπρστυφχψω※⚡︎✦✧';
-    const fontSize = 14;
-    const columns = Math.floor(canvas.width / fontSize);
+    // ÉPICO Matrix characters - More symbols for the resistance
+    const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ※⚡✦✧ΨΦΩ◉◎●○◇◆■□▲▼►◄↑↓←→∞∂∆∇∈∉⊂⊃∪∩∧∨';
+    const fontSize = 12;
+    const columns = Math.floor(canvas.width / fontSize / 1.2);
     const drops: number[] = [];
+    const speeds: number[] = [];
+    const brightnesses: number[] = [];
 
-    // Initialize drops
+    // Initialize drops with random properties
     for (let i = 0; i < columns; i++) {
       drops[i] = Math.random() * canvas.height / fontSize;
+      speeds[i] = Math.random() * 0.5 + 0.5; // Variable speed
+      brightnesses[i] = Math.random();
     }
 
     const draw = () => {
-      // Black background with slight opacity for trail effect
-      ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+      // Black background with fade effect
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = '#00ff41'; // Matrix green
       ctx.font = `${fontSize}px 'Fira Code', monospace`;
 
       for (let i = 0; i < drops.length; i++) {
         // Random character
         const char = chars[Math.floor(Math.random() * chars.length)];
         
-        // Add some randomness to brightness
-        const brightness = Math.random();
+        // Dynamic brightness and color
+        brightnesses[i] += (Math.random() - 0.5) * 0.1;
+        brightnesses[i] = Math.max(0, Math.min(1, brightnesses[i]));
+        
+        const brightness = brightnesses[i];
+        
         if (brightness > 0.98) {
-          ctx.fillStyle = '#ffffff'; // Bright flash
-        } else if (brightness > 0.95) {
-          ctx.fillStyle = '#00ff41'; // Normal green
-        } else if (brightness > 0.8) {
-          ctx.fillStyle = '#008f11'; // Darker green
+          ctx.fillStyle = '#ffffff'; // Bright white flash
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur = 10;
+        } else if (brightness > 0.9) {
+          ctx.fillStyle = '#00ff88'; // Bright green
+          ctx.shadowColor = '#00ff88';
+          ctx.shadowBlur = 5;
+        } else if (brightness > 0.7) {
+          ctx.fillStyle = '#00ff41'; // Matrix green
+          ctx.shadowColor = '#00ff41';
+          ctx.shadowBlur = 3;
+        } else if (brightness > 0.4) {
+          ctx.fillStyle = '#008f11'; // Medium green
+          ctx.shadowColor = '#008f11';
+          ctx.shadowBlur = 1;
         } else {
-          ctx.fillStyle = '#004400'; // Very dark green
+          ctx.fillStyle = '#004400'; // Dark green
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
         }
 
-        // Draw character
+        // Draw character with glow effect
         ctx.fillText(char, i * fontSize, drops[i] * fontSize);
 
-        // Reset drop to top randomly
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // Reset drop to top with variable probability
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.97) {
           drops[i] = 0;
+          speeds[i] = Math.random() * 0.5 + 0.5;
+          brightnesses[i] = Math.random();
         }
 
-        // Move drop down
-        drops[i]++;
+        // Move drop down at variable speed
+        drops[i] += speeds[i];
       }
     };
 
-    // Animation loop
-    const interval = setInterval(draw, 50);
+    // Smoother animation - 60fps but optimized
+    const animate = () => {
+      draw();
+      requestAnimationFrame(animate);
+    };
+
+    let frameCount = 0;
+    const optimizedAnimate = () => {
+      frameCount++;
+      if (frameCount % 2 === 0) { // 30fps for performance
+        draw();
+      }
+      requestAnimationFrame(optimizedAnimate);
+    };
+
+    optimizedAnimate();
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('resize', resizeCanvas);
     };
   }, []);
@@ -79,8 +117,8 @@ const MatrixRain: React.FC = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0 opacity-30"
-      style={{ mixBlendMode: 'multiply' }}
+      className="fixed inset-0 pointer-events-none z-0 opacity-40"
+      style={{ mixBlendMode: 'screen' }}
     />
   );
 };
