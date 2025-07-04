@@ -186,7 +186,8 @@ access(all) contract ClandestineNetwork {
     access(all) fun createEmisario(): @Emisario {
         ClandestineNetwork.totalEmisarios = ClandestineNetwork.totalEmisarios + 1
         let newEmisario <- create Emisario(id: ClandestineNetwork.totalEmisarios)
-        emit EmisarioCreated(emisarioID: newEmisario.id, owner: newEmisario.owner!.address)
+        // Don't emit event here since owner is not set yet
+        // Event will be emitted when resource is stored in transaction
         return <- newEmisario
     }
 
