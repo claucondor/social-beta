@@ -56,7 +56,7 @@ export class IAService {
         throw new Error('No content generated');
       }
 
-      return response.candidates[0].content.parts[0].text || '';
+      return response.candidates[0]?.content?.parts[0]?.text || '';
     } catch (error) {
       console.error('Error generating mission report:', error);
       throw new Error(`Failed to generate mission report: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -78,7 +78,7 @@ export class IAService {
       }
 
       // Extraer el código SVG de la respuesta
-      const generatedText = response.candidates[0].content.parts[0].text || '';
+      const generatedText = response.candidates[0]?.content?.parts[0]?.text || '';
       const svgContent = this.extractSVGFromResponse(generatedText);
       
       return svgContent;

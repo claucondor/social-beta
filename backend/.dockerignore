@@ -9,7 +9,6 @@ dist
 .eslintrc*
 .prettierrc*
 jest.config.*
-tsconfig.json
 .vscode
 .idea
 coverage

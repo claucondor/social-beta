@@ -3,6 +3,11 @@
 # Deployment script for La Red de Autómatas Backend
 set -e
 
+# --- Robustness: Change to the script's own directory ---
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd "$SCRIPT_DIR"
+# ----------------------------------------------------
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -13,12 +18,13 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}🚀 La Red de Autómatas - Backend Deployment${NC}"
 echo "================================================"
 
-# Check if required environment variables are set
-if [ -z "$GCP_PROJECT_ID" ]; then
-    echo -e "${RED}❌ Error: GCP_PROJECT_ID environment variable is not set${NC}"
-    echo "Please set it with: export GCP_PROJECT_ID=your-project-id"
-    exit 1
-fi
+    # Check if Project ID is provided as an argument
+    if [ -z "$1" ]; then
+        echo -e "${RED}❌ Error: No GCP Project ID provided as an argument.${NC}"
+        echo "Usage: ./deploy.sh YOUR_GCP_PROJECT_ID"
+        exit 1
+    fi
+    GCP_PROJECT_ID=$1
 
 # Check if gcloud is installed and authenticated
 if ! command -v gcloud &> /dev/null; then

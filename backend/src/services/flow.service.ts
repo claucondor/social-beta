@@ -59,8 +59,10 @@ export class FlowService {
         limit: 1000
       });
 
+      const transactionId = response;
+
       return {
-        transactionId: response.transactionId,
+        transactionId: transactionId,
         status: 'pending'
       };
     } catch (error) {
@@ -96,8 +98,10 @@ export class FlowService {
         limit: 1000
       });
 
+      const transactionId = response;
+
       return {
-        transactionId: response.transactionId,
+        transactionId: transactionId,
         status: 'pending'
       };
     } catch (error) {
@@ -136,7 +140,9 @@ export class FlowService {
    */
   async subscribeToBondEvolvedEvents(callback: (event: BondEvolvedEvent) => void): Promise<void> {
     try {
-      fcl.events(`${this.getBondContractAddress()}.BondEvolved`).subscribe(callback);
+      fcl.events(`${this.getBondContractAddress()}.BondEvolved`).subscribe((event: any) => {
+        callback(event as BondEvolvedEvent);
+      });
     } catch (error) {
       console.error('Error subscribing to bond evolved events:', error);
       throw new Error(`Failed to subscribe to events: ${error instanceof Error ? error.message : 'Unknown error'}`);

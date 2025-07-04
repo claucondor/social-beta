@@ -15,15 +15,15 @@
   "author": "La Red de Autómatas Team",
   "license": "MIT",
   "dependencies": {
-    "hono": "^3.11.7",
-    "@hono/node-server": "^1.6.0",
     "@google-cloud/firestore": "^7.1.0",
+    "@hono/node-server": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "hono": "^4.0.0",
     "@google-cloud/storage": "^7.7.0",
     "@google-cloud/vertexai": "^1.1.0",
     "@onflow/fcl": "^1.8.0",
     "@onflow/types": "^1.0.3",
     "@onflow/util-encode-key": "^1.0.3",
-    "dotenv": "^16.3.1",
     "zod": "^3.22.4",
     "crypto": "^1.0.1"
   },
