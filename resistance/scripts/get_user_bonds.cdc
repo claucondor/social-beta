@@ -1,7 +1,7 @@
 // get_user_bonds.cdc
 //
 // This script reads all the "ClaimTicket" NFTs from a user's collection
-// and, for each ticket, fetches the details of the Vínculo it represents.
+// and, for each ticket, fetches the details of the Vinculo it represents.
 
 import "NonFungibleToken"
 import "ClandestineNetwork"
@@ -26,8 +26,8 @@ access(all) fun main(userAddress: Address): [{String: AnyStruct}] {
         // Borrow the NFT to get its details, specifically the bondID.
         let claimTicket = collection.borrowNFT(id: id) as! &ClandestineNetwork.ClaimTicket
 
-        // Use the bondID from the ticket to fetch the actual Vínculo details.
-        let bondDetails = ClandestineNetwork.borrowVínculo(id: claimTicket.bondID)
+        // Use the bondID from the ticket to fetch the actual Vinculo details.
+        let bondDetails = ClandestineNetwork.borrowVinculo(id: claimTicket.bondID)
 
         if let bond = bondDetails {
             // If the bond exists, add its details to our result array.

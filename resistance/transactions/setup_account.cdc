@@ -4,7 +4,7 @@
 // It creates and saves two essential resources to the user's storage:
 // 1. Emisario: Stores the user's profile, level, XP, and skill tree progression.
 // 2. Collection: An NFT collection to hold the "ClaimTicket" NFTs, which prove
-//    co-ownership of a Vínculo.
+//    co-ownership of a Vinculo.
 
 import "NonFungibleToken"
 import "ClandestineNetwork"

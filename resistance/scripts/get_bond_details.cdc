@@ -1,15 +1,15 @@
 // get_bond_details.cdc
 //
-// This script reads the public data of a specific "Vínculo" (Bond)
+// This script reads the public data of a specific "Vinculo" (Bond)
 // by calling a view function on the ClandestineNetwork contract.
 
 import "ClandestineNetwork"
 
 access(all) fun main(bondID: UInt64): {String: AnyStruct}? {
     
-    // Call the public `borrowVínculo` function on the contract to get a reference
-    // to the Vínculo resource stored in the central BondVault.
-    let bondRef = ClandestineNetwork.borrowVínculo(id: bondID)
+    // Call the public `borrowVinculo` function on the contract to get a reference
+    // to the Vinculo resource stored in the central BondVault.
+    let bondRef = ClandestineNetwork.borrowVinculo(id: bondID)
 
     if bondRef == nil {
         return nil
@@ -17,7 +17,7 @@ access(all) fun main(bondID: UInt64): {String: AnyStruct}? {
 
     let bond = bondRef!
 
-    // Build the result object with the Vínculo's data.
+    // Build the result object with the Vinculo's data.
     let result = {
         "id": bond.id,
         "owners": bond.owners,

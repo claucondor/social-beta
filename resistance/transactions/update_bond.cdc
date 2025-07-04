@@ -1,6 +1,6 @@
 // update_bond.cdc
 //
-// This transaction updates the state of a Vínculo (Bond) after a successful
+// This transaction updates the state of a Vinculo (Bond) after a successful
 // interaction, such as a message reply. It grants Bond Points and handles
 // the leveling up of the relationship. This would be called by a trusted
 // server-side oracle.
@@ -9,9 +9,9 @@ import "ClandestineNetwork"
 
 transaction(bondID: UInt64, pointsToAdd: UFix64) {
 
-    // A reference to the Vínculo resource that will be modified.
+    // A reference to the Vinculo resource that will be modified.
     // This requires access to the central BondVault.
-    let bondRef: &ClandestineNetwork.Vínculo
+    let bondRef: &ClandestineNetwork.Vinculo
 
     prepare(admin: auth(Storage) &Account) {
         // This transaction must be signed by an account with access to the BondVault,
@@ -20,7 +20,7 @@ transaction(bondID: UInt64, pointsToAdd: UFix64) {
         let vaultRef = admin.storage.borrow<&ClandestineNetwork.BondVault>(from: /storage/ClandestineBondVault)
             ?? panic("Could not borrow a reference to the BondVault")
             
-        self.bondRef = vaultRef.borrowVínculo(id: bondID)
+        self.bondRef = vaultRef.borrowVinculo(id: bondID)
             ?? panic("Bond with the specified ID not found in the vault")
     }
 
@@ -28,7 +28,7 @@ transaction(bondID: UInt64, pointsToAdd: UFix64) {
         // --- Grant Bond Points ---
         self.bondRef.messagesExchanged = self.bondRef.messagesExchanged + 1
         self.bondRef.bondPoints = self.bondRef.bondPoints + pointsToAdd
-        log("Granted ".concat(pointsToAdd.toString()).concat(" Bond Points to Vínculo #").concat(self.bondRef.id.toString()))
+        log("Granted ".concat(pointsToAdd.toString()).concat(" Bond Points to Vinculo #").concat(self.bondRef.id.toString()))
         log("New total: ".concat(self.bondRef.bondPoints.toString()))
 
         // --- Handle Bond Level Up ---
@@ -42,9 +42,9 @@ transaction(bondID: UInt64, pointsToAdd: UFix64) {
             
             // We don't reset or consume bond points; they are a lifetime measure of the relationship's strength.
 
-            log("BOND LEVEL UP! Vínculo #".concat(self.bondRef.id.toString()).concat(" is now level ").concat(self.bondRef.bondLevel.toString()))
+            log("BOND LEVEL UP! Vinculo #".concat(self.bondRef.id.toString()).concat(" is now level ").concat(self.bondRef.bondLevel.toString()))
 
-            // Emit an event to notify off-chain systems that the Vínculo has evolved.
+            // Emit an event to notify off-chain systems that the Vinculo has evolved.
             // This can trigger the AI to write the next chapter of the story, update the
             // generative art, and unlock new abilities for the pair.
             emit ClandestineNetwork.BondEvolved(

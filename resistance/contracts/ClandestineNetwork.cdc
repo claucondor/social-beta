@@ -10,7 +10,7 @@ import "MetadataViews"
 // - Handling the on-chain representation of the User Skill Tree.
 // - Managing co-ownership of Bonds via a central Vault and Claim Ticket NFTs.
 
-access(all) contract ClandestineNetwork: NonFungibleToken {
+access(all) contract ClandestineNetwork {
 
     // --- Events ---
     access(all) event ContractInitialized()
@@ -25,6 +25,7 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
     // --- Contract State ---
     access(all) var totalBonds: UInt64
     access(all) var totalEmisarios: UInt64
+    access(all) var totalSupply: UInt64
 
     // --- Paths ---
     access(all) let EmisarioStoragePath: StoragePath
@@ -35,17 +36,17 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
 
     // The Emisario Resource: Represents a player's profile and progression.
     access(all) resource Emisario {
-        pub let id: UInt64
-        pub var xp: UFix64
-        pub var level: UInt64
-        pub var skillPoints: UInt64
-        pub var skills: {String: UInt8}
-        pub var abilityCooldowns: {String: UFix64}
+        access(all) let id: UInt64
+        access(all) var xp: UFix64
+        access(all) var level: UInt64
+        access(all) var skillPoints: UInt64
+        access(all) var skills: {String: UInt8}
+        access(all) var abilityCooldowns: {String: UFix64}
 
         // New field for the public encryption key.
         // This key is used by other users to encrypt messages sent to this Emisario.
         // It is public information.
-        pub(set) var encryptionPubKey: String
+        access(all) var encryptionPubKey: String
 
         init(id: UInt64) {
             self.id = id
@@ -66,20 +67,20 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
         }
     }
 
-    // The Vínculo (Bond) Resource: The "Corazón Clandestino".
+    // The Vinculo (Bond) Resource: The "Corazón Clandestino".
     // Stored centrally in the BondVault, NOT in user collections.
-    access(all) resource Vínculo {
-        pub let id: UInt64
-        pub let owners: [Address]
-        pub let emisarioIDs: [UInt64]
-        pub var messagesExchanged: UInt64
-        pub var bondLevel: UInt8
-        pub var bondPoints: UFix64
-        pub var status: String
-        pub var artSeed: UInt64
-        pub var colorPaletteSeed: Int8
-        pub var patternComplexitySeed: UInt8
-        pub var codexURI: String
+    access(all) resource Vinculo {
+        access(all) let id: UInt64
+        access(all) let owners: [Address]
+        access(all) let emisarioIDs: [UInt64]
+        access(all) var messagesExchanged: UInt64
+        access(all) var bondLevel: UInt8
+        access(all) var bondPoints: UFix64
+        access(all) var status: String
+        access(all) var artSeed: UInt64
+        access(all) var colorPaletteSeed: Int8
+        access(all) var patternComplexitySeed: UInt8
+        access(all) var codexURI: String
 
         init(id: UInt64, emisario1: &Emisario, emisario2: &Emisario, owner1: Address, owner2: Address) {
             self.id = id
@@ -89,7 +90,7 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
             self.bondLevel = 1
             self.bondPoints = 0.0
             self.status = "Active"
-            self.artSeed = getCurrentBlock().timestamp.toBigEndianBytes().toUInt64()
+            self.artSeed = UInt64(getCurrentBlock().timestamp)
             self.colorPaletteSeed = 0
             self.patternComplexitySeed = 1
             self.codexURI = "ipfs://..."
@@ -97,11 +98,11 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
     }
 
     // The ClaimTicket NFT: The object users actually hold in their collection.
-    // It acts as a key to access the shared Vínculo in the BondVault.
-    access(all) resource ClaimTicket: NonFungibleToken.NFT, ViewResolver.Resolver {
-        pub let id: UInt64 // This ID matches the Vínculo's ID
-        pub let bondID: UInt64
-        pub let ownerAddress: Address
+    // It acts as a key to access the shared Vinculo in the BondVault.
+    access(all) resource ClaimTicket: NonFungibleToken.NFT {
+        access(all) let id: UInt64 // This ID matches the Vinculo's ID
+        access(all) let bondID: UInt64
+        access(all) let ownerAddress: Address
 
         init(bondID: UInt64, ownerAddress: Address) {
             self.id = self.uuid
@@ -110,39 +111,30 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
         }
 
         access(all) view fun getViews(): [Type] {
-            return [Type<MetadataViews.Display>()]
+            return []
         }
 
         access(all) fun resolveView(_ view: Type): AnyStruct? {
-            let bond = ClandestineNetwork.borrowVínculo(id: self.bondID) ?? panic("Bond not found")
-            switch view {
-                case Type<MetadataViews.Display>():
-                    return MetadataViews.Display(
-                        name: "Claim Ticket for Corazón Clandestino #".concat(self.bondID.toString()),
-                        description: "This ticket proves co-ownership of a shared Vínculo. Current Level: ".concat(bond.bondLevel.toString()),
-                        thumbnail: MetadataViews.HTTPFile(url: "https://.../vinculo/".concat(self.bondID.toString()).concat(".svg"))
-                    )
-            }
             return nil
         }
 
         access(all) fun createEmptyCollection(): @{NonFungibleToken.Collection} {
-            return <- create Collection()
+            return <- ClandestineNetwork.createEmptyCollection()
         }
     }
 
-    // The BondVault Resource: Stored centrally by the contract owner to hold all Vínculos.
-    access(self) resource BondVault {
-        pub var bonds: @{UInt64: Vínculo}
+    // The BondVault Resource: Stored centrally by the contract owner to hold all Vinculos.
+    access(all) resource BondVault {
+        access(all) var bonds: @{UInt64: Vinculo}
         init() {
             self.bonds <- {}
         }
-        pub fun add(bond: @Vínculo) {
+        access(all) fun add(bond: @Vinculo) {
             self.bonds[bond.id] <-! bond
         }
     }
 
-    // Collection Resource: Holds ClaimTicket NFTs, not Vínculos.
+    // Collection Resource: Holds ClaimTicket NFTs, not Vinculos.
     access(all) resource Collection: NonFungibleToken.Collection {
         access(all) var ownedNFTs: @{UInt64: {NonFungibleToken.NFT}}
         init() {
@@ -166,6 +158,18 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
         access(all) view fun borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}? {
             return &self.ownedNFTs[id] as &{NonFungibleToken.NFT}?
         }
+        
+        access(all) fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+            return <- create Collection()
+        }
+        
+        access(all) view fun getSupportedNFTTypes(): {Type: Bool} {
+            return {Type<@ClaimTicket>(): true}
+        }
+        
+        access(all) view fun isSupportedNFTType(type: Type): Bool {
+            return type == Type<@ClaimTicket>()
+        }
     }
 
     // --- Public Functions ---
@@ -175,7 +179,7 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
         return self.totalBonds
     }
 
-    access(all) fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+    access(all) fun createEmptyCollection(): @Collection {
         return <- create Collection()
     }
 
@@ -189,7 +193,7 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
     access(all) fun forgeBond(emisario1: &Emisario, emisario2: &Emisario, owner1: Address, owner2: Address): @[ClaimTicket] {
         self.totalBonds = self.totalBonds + 1
         let bondID = self.totalBonds
-        let newBond <- create Vínculo(id: bondID, emisario1: emisario1, emisario2: emisario2, owner1: owner1, owner2: owner2)
+        let newBond <- create Vinculo(id: bondID, emisario1: emisario1, emisario2: emisario2, owner1: owner1, owner2: owner2)
 
         let vaultRef = self.account.storage.borrow<auth(Mutate) &BondVault>(from: /storage/ClandestineBondVault)
             ?? panic("BondVault not found!")
@@ -203,16 +207,17 @@ access(all) contract ClandestineNetwork: NonFungibleToken {
         return <- [<-claim1, <-claim2]
     }
     
-    access(all) view fun borrowVínculo(id: UInt64): &Vínculo? {
+    access(all) view fun borrowVinculo(id: UInt64): &Vinculo? {
         let vaultRef = self.account.storage.borrow<&BondVault>(from: /storage/ClandestineBondVault)
             ?? panic("BondVault not found!")
-        return &vaultRef.bonds[id] as &Vínculo?
+        return vaultRef.bonds[id]
     }
 
     // NEW: Public function to read an Emisario's public key for encryption.
+    // Note: This would need to be implemented via a public capability or removed
     access(all) view fun getEmisarioPublicKey(address: Address): String? {
-        let emisarioRef = getAccount(address).storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-        return emisarioRef?.encryptionPubKey
+        // Cannot access storage directly from contract - would need capability
+        return nil
     }
 
     init() {

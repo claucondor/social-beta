@@ -20,17 +20,17 @@ access(all) contract Gifts {
 
     // The core resource that holds the gift details and escrowed funds.
     access(all) resource Gift {
-        pub let id: UInt64
-        pub let sender: Address
-        pub let recipient: Address
-        pub let amount: UFix64
-        pub var proofHash: String?
-        pub var state: String // "offered", "confirmed", "completed", "cancelled"
+        access(all) let id: UInt64
+        access(all) let sender: Address
+        access(all) let recipient: Address
+        access(all) let amount: UFix64
+        access(all) var proofHash: String?
+        access(all) var state: String // "offered", "confirmed", "completed", "cancelled"
 
         // The vault to hold the escrowed tokens
-        pub let escrow: @FungibleToken.Vault
+        access(all) var escrow: @{FungibleToken.Vault}?
 
-        init(sender: Address, recipient: Address, escrowVault: @FungibleToken.Vault) {
+        init(sender: Address, recipient: Address, escrowVault: @{FungibleToken.Vault}) {
             self.id = Gifts.totalGifts
             self.sender = sender
             self.recipient = recipient
@@ -41,7 +41,7 @@ access(all) contract Gifts {
         }
 
         // The recipient provides proof of delivery
-        pub fun confirm(proofHash: String, by: Address) {
+        access(all) fun confirm(proofHash: String, by: Address) {
             pre {
                 self.state == "offered": "Gift is not in a state to be confirmed."
                 by == self.recipient: "Only the recipient can confirm a gift."
@@ -52,7 +52,7 @@ access(all) contract Gifts {
         }
 
         // The sender verifies the proof and releases the funds
-        pub fun complete(by: Address): @FungibleToken.Vault {
+        access(all) fun complete(by: Address): @{FungibleToken.Vault} {
             pre {
                 self.state == "confirmed": "Gift has not been confirmed by the recipient yet."
                 by == self.sender: "Only the sender can complete the gift."
@@ -60,19 +60,23 @@ access(all) contract Gifts {
             }
             self.state = "completed"
             emit GiftCompleted(giftID: self.id, to: self.recipient, amount: self.amount)
-            return <- self.escrow
+            let vault <- self.escrow <- nil
+            return <- vault!
         }
 
         // Either party can cancel before completion (funds returned to sender)
-        pub fun cancel(by: Address): @FungibleToken.Vault {
+        access(all) fun cancel(by: Address): @{FungibleToken.Vault} {
             pre {
                 self.state == "offered" || self.state == "confirmed": "Gift is already completed or cancelled."
                 by == self.sender || by == self.recipient: "Only the sender or recipient can cancel the gift."
             }
             self.state = "cancelled"
             emit GiftCancelled(giftID: self.id, by: by)
-            return <- self.escrow
+            let vault <- self.escrow <- nil
+            return <- vault!
         }
+        
+
     }
 
     // --- Gift Management ---
@@ -82,7 +86,7 @@ access(all) contract Gifts {
     // --- Public Functions ---
     
     // The sender calls this to initiate a gift, depositing funds into escrow.
-    pub fun offerGift(to: Address, funds: @FungibleToken.Vault) {
+    access(all) fun offerGift(to: Address, funds: @{FungibleToken.Vault}) {
         let sender = funds.owner!.address
         let gift <- create Gift(sender: sender, recipient: to, escrowVault: <-funds)
         
@@ -95,13 +99,13 @@ access(all) contract Gifts {
     }
 
     // The recipient calls this to submit their proof.
-    pub fun confirmGift(giftID: UInt64, proofHash: String, by: Address) {
+    access(all) fun confirmGift(giftID: UInt64, proofHash: String, by: Address) {
         let gift = self.borrowGift(giftID: giftID)
         gift.confirm(proofHash: proofHash, by: by)
     }
 
     // The sender calls this to release the funds.
-    pub fun completeGift(giftID: UInt64, by: Address): @FungibleToken.Vault {
+    access(all) fun completeGift(giftID: UInt64, by: Address): @{FungibleToken.Vault} {
         let gift <- self.pendingGifts.remove(key: giftID) ?? panic("Gift not found")
         let funds <- gift.complete(by: by)
         destroy gift
@@ -109,7 +113,7 @@ access(all) contract Gifts {
     }
 
     // A public function to cancel a gift.
-    pub fun cancelGift(giftID: UInt64, by: Address): @FungibleToken.Vault {
+    access(all) fun cancelGift(giftID: UInt64, by: Address): @{FungibleToken.Vault} {
         let gift <- self.pendingGifts.remove(key: giftID) ?? panic("Gift not found")
         let funds <- gift.cancel(by: by)
         destroy gift

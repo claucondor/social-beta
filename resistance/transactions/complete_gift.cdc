@@ -43,7 +43,7 @@ transaction(giftID: UInt64) {
         log("Gift successfully completed.")
 
         // FUTURE: This is where we would call another transaction or contract
-        // to grant Bond Points to the Vínculo shared by the sender and recipient.
+        // to grant Bond Points to the Vinculo shared by the sender and recipient.
         // e.g., ClandestineNetwork.grantBondPoints(sender: self.senderAddress, recipient: recipientAddress, points: 250.0)
     }
 } 

@@ -17,18 +17,18 @@ access(all) contract SkillRegistry {
     // Defines all the static properties of a single skill.
     access(all) struct SkillData {
         // The unique identifier for the skill, e.g., "rafagaEpistolar"
-        pub let id: String
+        access(all) let id: String
         // The branch this skill belongs to, e.g., "estratega"
-        pub let branch: String
+        access(all) let branch: String
         // The maximum level a player can invest in this skill.
-        pub let maxLevel: UInt8
+        access(all) let maxLevel: UInt8
         // The minimum Emisario level required to unlock this skill.
-        pub let levelRequirement: UInt64
+        access(all) let levelRequirement: UInt64
         // The ID of the skill that must be unlocked before this one.
         // Optional, as Tier 1 skills have no prerequisite.
-        pub let prereqID: String?
+        access(all) let prereqID: String?
         // A short description for UI purposes.
-        pub let description: String
+        access(all) let description: String
 
         init(id: String, branch: String, maxLevel: UInt8, levelRequirement: UInt64, prereqID: String?, description: String) {
             self.id = id
