@@ -7,6 +7,7 @@ export interface Message {
   createdAt: number;
   processed?: boolean;
   processedAt?: number;
+  senderAddress?: string;
 }
 
 // Bond/NFT types
@@ -33,9 +34,18 @@ export interface ConversationMessage {
 export interface User {
   address: string;
   displayName?: string;
+  publicKey?: string;
   joinedAt: number;
   totalBonds: number;
   totalXP: number;
+  lastActive: number;
+  status: 'active' | 'inactive';
+}
+
+export interface UserRegistration {
+  address: string;
+  displayName?: string;
+  publicKey?: string;
 }
 
 // Flow blockchain types

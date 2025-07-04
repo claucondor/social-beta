@@ -225,4 +225,193 @@ export class FlowService {
       lastEvolution: rawData.lastEvolution ? parseInt(rawData.lastEvolution) : undefined
     };
   }
+
+  /**
+   * Crea un nuevo Emisario en la blockchain
+   */
+  async createEmisario(userAddress: string): Promise<FlowTransaction> {
+    try {
+      const transactionCode = `
+        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
+
+        transaction {
+          prepare(signer: auth(Storage, Capabilities) &Account) {
+            // Check if account already has an Emisario
+            if signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath) != nil {
+              panic("Account already has an Emisario")
+            }
+
+            // Create new Emisario
+            let newEmisario <- ClandestineNetwork.createEmisario()
+            
+            // Store it in the account
+            signer.storage.save(<-newEmisario, to: ClandestineNetwork.EmisarioStoragePath)
+            
+            // Create ClaimTicket collection if it doesn't exist
+            if signer.storage.borrow<&ClandestineNetwork.Collection>(from: ClandestineNetwork.ClaimCollectionStoragePath) == nil {
+              let collection <- ClandestineNetwork.createEmptyCollection()
+              signer.storage.save(<-collection, to: ClandestineNetwork.ClaimCollectionStoragePath)
+              
+              // Create a public capability for the collection
+              let cap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionStoragePath)
+              signer.capabilities.publish(cap, at: ClandestineNetwork.ClaimCollectionPublicPath)
+            }
+          }
+        }
+      `;
+
+      const response = await fcl.mutate({
+        cadence: transactionCode,
+        args: () => [],
+        authorizations: [this.createAuthorizationFunction(userAddress)],
+        payer: this.oracleAuthorization.bind(this),
+        proposer: this.createAuthorizationFunction(userAddress),
+        limit: 1000
+      });
+
+      return {
+        transactionId: response,
+        status: 'pending'
+      };
+    } catch (error) {
+      console.error('Error creating Emisario:', error);
+      throw new Error(`Failed to create Emisario: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Configura la clave pública de cifrado de un usuario
+   */
+  async setPublicKey(userAddress: string, publicKey: string): Promise<FlowTransaction> {
+    try {
+      const transactionCode = `
+        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
+
+        transaction(newPublicKey: String) {
+          let emisarioRef: &ClandestineNetwork.Emisario
+
+          prepare(signer: auth(Storage) &Account) {
+            self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+              ?? panic("Emisario resource not found. Please run setup_account.cdc first")
+          }
+
+          execute {
+            self.emisarioRef.setPublicKey(newKey: newPublicKey)
+          }
+        }
+      `;
+
+      const response = await fcl.mutate({
+        cadence: transactionCode,
+        args: (arg: any, t: any) => [arg(publicKey, t.String)],
+        authorizations: [this.createAuthorizationFunction(userAddress)],
+        payer: this.createAuthorizationFunction(userAddress),
+        proposer: this.createAuthorizationFunction(userAddress),
+        limit: 1000
+      });
+
+      return {
+        transactionId: response,
+        status: 'pending'
+      };
+    } catch (error) {
+      console.error('Error setting public key:', error);
+      throw new Error(`Failed to set public key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Crea un bond entre dos usuarios
+   */
+  async forgeBond(initiatorAddress: string, partnerAddress: string): Promise<FlowTransaction> {
+    try {
+      const transactionCode = `
+        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
+        import NonFungibleToken from 0x1d7e57aa55817448
+
+        transaction(partnerAddress: Address) {
+          let initiatorEmisarioRef: &ClandestineNetwork.Emisario
+          let initiatorCollectionRef: &{NonFungibleToken.Collection}
+          let partnerCollectionCap: Capability<&{NonFungibleToken.Collection}>
+
+          prepare(initiator: auth(Storage, Capabilities) &Account) {
+            self.initiatorEmisarioRef = initiator.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+              ?? panic("Initiator's Emisario resource not found. Please run setup_account.cdc")
+
+            self.initiatorCollectionRef = initiator.storage.borrow<&{NonFungibleToken.Collection}>(from: ClandestineNetwork.ClaimCollectionStoragePath)
+              ?? panic("Initiator's ClaimTicket Collection not found. Please run setup_account.cdc")
+
+            self.partnerCollectionCap = getAccount(partnerAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
+            
+            if !self.partnerCollectionCap.check() {
+              panic("Partner's ClaimTicket Collection capability is not valid or has not been published.")
+            }
+          }
+
+          execute {
+            let tickets <- ClandestineNetwork.forgeBondSimple(
+              emisario1: self.initiatorEmisarioRef,
+              owner1: self.initiatorEmisarioRef.owner!.address,
+              owner2: partnerAddress
+            )
+
+            // Distribute the Claim Tickets
+            let partnerCollection = self.partnerCollectionCap.borrow()
+              ?? panic("Could not borrow partner's collection.")
+            partnerCollection.deposit(token: <- tickets.removeFirst())
+
+            self.initiatorCollectionRef.deposit(token: <- tickets.removeFirst())
+
+            destroy tickets
+          }
+        }
+      `;
+
+      const response = await fcl.mutate({
+        cadence: transactionCode,
+        args: (arg: any, t: any) => [arg(partnerAddress, t.Address)],
+        authorizations: [this.createAuthorizationFunction(initiatorAddress)],
+        payer: this.createAuthorizationFunction(initiatorAddress),
+        proposer: this.createAuthorizationFunction(initiatorAddress),
+        limit: 1000
+      });
+
+      return {
+        transactionId: response,
+        status: 'pending'
+      };
+    } catch (error) {
+      console.error('Error forging bond:', error);
+      throw new Error(`Failed to forge bond: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Crea una función de autorización para una dirección específica
+   */
+  private createAuthorizationFunction(address: string) {
+    return async (account: any) => {
+      return {
+        ...account,
+        addr: address,
+        keyId: 0,
+        signingFunction: async (signable: any) => {
+          // En un frontend real, esto sería manejado por el wallet del usuario
+          // Aquí simulamos para el backend
+          return {
+            signature: 'user_signature',
+            keyId: 0,
+            addr: address
+          };
+        }
+      };
+    };
+  }
+
+  /**
+   * Obtiene la dirección del contrato ClandestineNetwork
+   */
+  private getClandestineNetworkAddress(): string {
+    return config.flow.oracleAddress; // Usamos la misma dirección donde desplegamos
+  }
 }

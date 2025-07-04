@@ -229,4 +229,154 @@ export class MessageService {
       return false;
     }
   }
+
+  /**
+   * Crea un nuevo usuario en Firestore
+   */
+  async createUser(
+    address: string,
+    displayName?: string,
+    publicKey?: string
+  ): Promise<ApiResponse<{ address: string; displayName?: string }>> {
+    try {
+      const now = Date.now();
+      const userData = {
+        address,
+        displayName: displayName || `Emisario_${address.slice(-6)}`,
+        publicKey: publicKey || '',
+        joinedAt: now,
+        totalBonds: 0,
+        totalXP: 0,
+        lastActive: now,
+        status: 'active'
+      };
+
+      await this.firestore
+        .collection(config.firestore.usersCollection)
+        .doc(address)
+        .set(userData);
+
+      return {
+        success: true,
+        data: {
+          address: userData.address,
+          displayName: userData.displayName
+        },
+        timestamp: now
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: Date.now()
+      };
+    }
+  }
+
+  /**
+   * Obtiene información de un usuario
+   */
+  async getUser(address: string): Promise<any> {
+    try {
+      const doc = await this.firestore
+        .collection(config.firestore.usersCollection)
+        .doc(address)
+        .get();
+
+      if (!doc.exists) {
+        return null;
+      }
+
+      return {
+        id: doc.id,
+        ...doc.data()
+      };
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Actualiza la clave pública de un usuario
+   */
+  async updateUserPublicKey(address: string, publicKey: string): Promise<boolean> {
+    try {
+      await this.firestore
+        .collection(config.firestore.usersCollection)
+        .doc(address)
+        .update({
+          publicKey,
+          lastActive: Date.now()
+        });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating user public key:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Actualiza estadísticas de usuario
+   */
+  async updateUserStats(address: string, updates: { totalBonds?: number; totalXP?: number }): Promise<boolean> {
+    try {
+      await this.firestore
+        .collection(config.firestore.usersCollection)
+        .doc(address)
+        .update({
+          ...updates,
+          lastActive: Date.now()
+        });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating user stats:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Busca usuarios por nombre o dirección
+   */
+  async searchUsers(query: string, limit: number = 20): Promise<any[]> {
+    try {
+      // Buscar por displayName (parcial)
+      const nameSnapshot = await this.firestore
+        .collection(config.firestore.usersCollection)
+        .where('displayName', '>=', query)
+        .where('displayName', '<=', query + '\uf8ff')
+        .limit(limit)
+        .get();
+
+      const users: any[] = [];
+      nameSnapshot.forEach(doc => {
+        users.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      // Si no hay resultados suficientes y parece una dirección
+      if (users.length < limit && query.startsWith('0x')) {
+        const addressDoc = await this.firestore
+          .collection(config.firestore.usersCollection)
+          .doc(query)
+          .get();
+
+        if (addressDoc.exists && !users.find(u => u.address === query)) {
+          users.push({
+            id: addressDoc.id,
+            ...addressDoc.data()
+          });
+        }
+      }
+
+      return users;
+    } catch (error) {
+      console.error('Error searching users:', error);
+      return [];
+    }
+  }
 }

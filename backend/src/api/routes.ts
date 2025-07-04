@@ -329,19 +329,26 @@ app.get('/api/docs', (c) => {
     version: '1.0.0',
     endpoints: {
       health: 'GET /health - Health check',
+      users: {
+        register: 'POST /api/users/register - Register new user and create Emisario',
+        get: 'GET /api/users/:address - Get user information',
+        updatePublicKey: 'PUT /api/users/:address/public-key - Update user public encryption key',
+        search: 'GET /api/users/search?q=query - Search users by name or address'
+      },
       messages: {
         create: 'POST /api/messages - Create delayed message',
         getByAddress: 'GET /api/messages/:address - Get messages for address',
         stats: 'GET /api/messages/stats - Get queue statistics'
       },
+      bonds: {
+        create: 'POST /api/bonds/create - Create new bond between users',
+        get: 'GET /api/bonds/:bondId - Get bond information',
+        grantXP: 'POST /api/bonds/:bondId/grant-xp - Grant XP to user'
+      },
       scheduler: {
         processQueue: 'POST /api/scheduler/process-queue - Process message queue',
         processBonds: 'POST /api/scheduler/process-bonds - Process bond evolutions',
         maintenance: 'POST /api/scheduler/maintenance - Run maintenance tasks'
-      },
-      bonds: {
-        get: 'GET /api/bonds/:bondId - Get bond information',
-        grantXP: 'POST /api/bonds/:bondId/grant-xp - Grant XP to user'
       },
       transactions: {
         status: 'GET /api/transactions/:txId/status - Get transaction status'
@@ -354,8 +361,189 @@ app.get('/api/docs', (c) => {
       system: {
         stats: 'GET /api/system/stats - Get system statistics'
       }
+    },
+    examples: {
+      registerUser: {
+        method: 'POST',
+        url: '/api/users/register',
+        body: {
+          address: '0x1234567890abcdef',
+          displayName: 'Mi Nombre Emisario',
+          publicKey: 'optional_encryption_key'
+        }
+      },
+      createMessage: {
+        method: 'POST',
+        url: '/api/messages',
+        body: {
+          recipientAddress: '0x1234567890abcdef',
+          encryptedContent: 'mensaje_cifrado_base64',
+          delayMinutes: 30
+        }
+      },
+      createBond: {
+        method: 'POST',
+        url: '/api/bonds/create',
+        body: {
+          initiatorAddress: '0x1111111111111111',
+          partnerAddress: '0x2222222222222222'
+        }
+      }
     }
   });
+});
+
+// User registration and management API
+app.post('/api/users/register', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { address, displayName, publicKey } = body;
+
+    if (!address) {
+      return c.json({
+        success: false,
+        error: 'address is required'
+      }, 400);
+    }
+
+    // Create Emisario on Flow blockchain
+    const transaction = await flowService.createEmisario(address);
+    
+    // Store user data in Firestore
+    const user = await messageService.createUser(address, displayName, publicKey);
+
+    return c.json({
+      success: true,
+      data: {
+        user,
+        transaction
+      },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+app.get('/api/users/:address', async (c) => {
+  try {
+    const address = c.req.param('address');
+    const user = await messageService.getUser(address);
+
+    if (!user) {
+      return c.json({
+        success: false,
+        error: 'User not found'
+      }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: user,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Failed to fetch user: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+app.put('/api/users/:address/public-key', async (c) => {
+  try {
+    const address = c.req.param('address');
+    const body = await c.req.json();
+    const { publicKey } = body;
+
+    if (!publicKey) {
+      return c.json({
+        success: false,
+        error: 'publicKey is required'
+      }, 400);
+    }
+
+    // Update on blockchain
+    const transaction = await flowService.setPublicKey(address, publicKey);
+    
+    // Update in database
+    await messageService.updateUserPublicKey(address, publicKey);
+
+    return c.json({
+      success: true,
+      data: { transaction },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Failed to update public key: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+app.get('/api/users/search', async (c) => {
+  try {
+    const query = c.req.query('q');
+    const limit = parseInt(c.req.query('limit') || '20');
+
+    if (!query) {
+      return c.json({
+        success: false,
+        error: 'Query parameter "q" is required'
+      }, 400);
+    }
+
+    const users = await messageService.searchUsers(query, limit);
+
+    return c.json({
+      success: true,
+      data: users,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+// Bond creation (when users start chatting)
+app.post('/api/bonds/create', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { initiatorAddress, partnerAddress } = body;
+
+    if (!initiatorAddress || !partnerAddress) {
+      return c.json({
+        success: false,
+        error: 'initiatorAddress and partnerAddress are required'
+      }, 400);
+    }
+
+    // Create bond on blockchain
+    const transaction = await flowService.forgeBond(initiatorAddress, partnerAddress);
+
+    return c.json({
+      success: true,
+      data: { transaction },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Failed to create bond: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
 });
 
 // 404 handler
