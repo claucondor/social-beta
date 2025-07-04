@@ -406,17 +406,45 @@ app.post('/api/users/register', async (c) => {
       }, 400);
     }
 
-    // Create Emisario on Flow blockchain
-    const transaction = await flowService.createEmisario(address);
-    
-    // Store user data in Firestore
+    // Store user data in Firestore (backend responsibility)
     const user = await messageService.createUser(address, displayName, publicKey);
+
+    // Return transaction code for frontend to execute
+    const transactionCode = `
+      import ClandestineNetwork from 0x2444e6b4d9327f09
+
+      transaction {
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+          // Check if account already has an Emisario
+          if signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath) != nil {
+            panic("Account already has an Emisario")
+          }
+
+          // Create new Emisario
+          let newEmisario <- ClandestineNetwork.createEmisario()
+          
+          // Store it in the account
+          signer.storage.save(<-newEmisario, to: ClandestineNetwork.EmisarioStoragePath)
+          
+          // Create ClaimTicket collection if it doesn't exist
+          if signer.storage.borrow<&ClandestineNetwork.Collection>(from: ClandestineNetwork.ClaimCollectionStoragePath) == nil {
+            let collection <- ClandestineNetwork.createEmptyCollection()
+            signer.storage.save(<-collection, to: ClandestineNetwork.ClaimCollectionStoragePath)
+            
+            // Create a public capability for the collection
+            let cap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionStoragePath)
+            signer.capabilities.publish(cap, at: ClandestineNetwork.ClaimCollectionPublicPath)
+          }
+        }
+      }
+    `;
 
     return c.json({
       success: true,
       data: {
         user,
-        transaction
+        transactionCode, // Frontend ejecuta esto
+        message: "Execute the transaction with your wallet to create your Emisario on-chain"
       },
       timestamp: Date.now()
     });
@@ -468,21 +496,40 @@ app.put('/api/users/:address/public-key', async (c) => {
       }, 400);
     }
 
-    // Update on blockchain
-    const transaction = await flowService.setPublicKey(address, publicKey);
-    
-    // Update in database
+    // Update in database (backend responsibility)
     await messageService.updateUserPublicKey(address, publicKey);
+
+    // Return transaction code for frontend to execute
+    const transactionCode = `
+      import ClandestineNetwork from 0x2444e6b4d9327f09
+
+      transaction(newPublicKey: String) {
+        let emisarioRef: &ClandestineNetwork.Emisario
+
+        prepare(signer: auth(Storage) &Account) {
+          self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+            ?? panic("Emisario resource not found. Please run setup_account.cdc first")
+        }
+
+        execute {
+          self.emisarioRef.setPublicKey(newKey: newPublicKey)
+        }
+      }
+    `;
 
     return c.json({
       success: true,
-      data: { transaction },
+      data: { 
+        transactionCode,
+        args: [publicKey],
+        message: "Execute this transaction with your wallet to update your public key on-chain"
+      },
       timestamp: Date.now()
     });
   } catch (error) {
     return c.json({
       success: false,
-      error: `Failed to update public key: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to prepare public key update: ${error instanceof Error ? error.message : 'Unknown error'}`,
       timestamp: Date.now()
     }, 500);
   }
@@ -529,8 +576,84 @@ app.post('/api/bonds/create', async (c) => {
       }, 400);
     }
 
-    // Create bond on blockchain
-    const transaction = await flowService.forgeBond(initiatorAddress, partnerAddress);
+    // Return transaction code for frontend to execute
+    const transactionCode = `
+      import ClandestineNetwork from 0x2444e6b4d9327f09
+      import NonFungibleToken from 0x1d7e57aa55817448
+
+      transaction(partnerAddress: Address) {
+        let initiatorEmisarioRef: &ClandestineNetwork.Emisario
+        let initiatorCollectionRef: &{NonFungibleToken.Collection}
+        let partnerCollectionCap: Capability<&{NonFungibleToken.Collection}>
+
+        prepare(initiator: auth(Storage, Capabilities) &Account) {
+          self.initiatorEmisarioRef = initiator.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+            ?? panic("Initiator's Emisario resource not found. Please run setup_account.cdc")
+
+          self.initiatorCollectionRef = initiator.storage.borrow<&{NonFungibleToken.Collection}>(from: ClandestineNetwork.ClaimCollectionStoragePath)
+            ?? panic("Initiator's ClaimTicket Collection not found. Please run setup_account.cdc")
+
+          self.partnerCollectionCap = getAccount(partnerAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
+          
+          if !self.partnerCollectionCap.check() {
+            panic("Partner's ClaimTicket Collection capability is not valid or has not been published.")
+          }
+        }
+
+        execute {
+          let tickets <- ClandestineNetwork.forgeBondSimple(
+            emisario1: self.initiatorEmisarioRef,
+            owner1: self.initiatorEmisarioRef.owner!.address,
+            owner2: partnerAddress
+          )
+
+          // Distribute the Claim Tickets
+          let partnerCollection = self.partnerCollectionCap.borrow()
+            ?? panic("Could not borrow partner's collection.")
+          partnerCollection.deposit(token: <- tickets.removeFirst())
+
+          self.initiatorCollectionRef.deposit(token: <- tickets.removeFirst())
+
+          destroy tickets
+        }
+      }
+    `;
+
+    return c.json({
+      success: true,
+      data: { 
+        transactionCode,
+        args: [partnerAddress],
+        message: "Execute this transaction with your wallet to create the bond on-chain"
+      },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Failed to prepare bond creation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+// === ADMINISTRATIVE OPERATIONS (Backend executes with Oracle PK) ===
+
+// Grant XP to user (Admin operation)
+app.post('/api/admin/grant-xp', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { recipientAddress, amount, reason } = body;
+
+    if (!recipientAddress || !amount) {
+      return c.json({
+        success: false,
+        error: 'recipientAddress and amount are required'
+      }, 400);
+    }
+
+    // This is executed by the backend with oracle privileges
+    const transaction = await flowService.grantXP(recipientAddress, amount, reason);
 
     return c.json({
       success: true,
@@ -540,7 +663,127 @@ app.post('/api/bonds/create', async (c) => {
   } catch (error) {
     return c.json({
       success: false,
-      error: `Failed to create bond: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to grant XP: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+// Register new skill (Admin operation)
+app.post('/api/admin/register-skill', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { id, branch, maxLevel, levelRequirement, prereqID, description } = body;
+
+    if (!id || !branch || !maxLevel || !levelRequirement || !description) {
+      return c.json({
+        success: false,
+        error: 'id, branch, maxLevel, levelRequirement, and description are required'
+      }, 400);
+    }
+
+    // This is executed by the backend with oracle privileges
+    const transaction = await flowService.registerSkill({
+      id,
+      branch,
+      maxLevel,
+      levelRequirement,
+      prereqID,
+      description
+    });
+
+    return c.json({
+      success: true,
+      data: { transaction },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Failed to register skill: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now()
+    }, 500);
+  }
+});
+
+// === TRANSACTION CODE PROVIDERS (Frontend executes) ===
+
+// Get transaction code for unlocking skills
+app.post('/api/transactions/unlock-skill', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { skillID } = body;
+
+    if (!skillID) {
+      return c.json({
+        success: false,
+        error: 'skillID is required'
+      }, 400);
+    }
+
+    const transactionCode = `
+      import ClandestineNetwork from 0x2444e6b4d9327f09
+      import SkillRegistry from 0x2444e6b4d9327f09
+
+      transaction(skillID: String) {
+        let emisarioRef: &ClandestineNetwork.Emisario
+        let skillData: SkillRegistry.SkillData
+
+        prepare(signer: auth(Storage) &Account) {
+          self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+            ?? panic("Emisario resource not found. Please run setup_account.cdc")
+
+          self.skillData = SkillRegistry.getSkillData(skillID: skillID)
+            ?? panic("Skill with the specified ID is not registered.")
+        }
+
+        execute {
+          // Check if the user has skill points to spend
+          if self.emisarioRef.skillPoints < 1 {
+            panic("Not enough skill points. Current: 0")
+          }
+
+          // Check if the user meets the level requirement
+          if self.emisarioRef.level < self.skillData.levelRequirement {
+            panic("Level requirement not met. Required: ".concat(self.skillData.levelRequirement.toString()).concat(", Current: ").concat(self.emisarioRef.level.toString()))
+          }
+          
+          // Check for prerequisites
+          let currentSkillLevel = self.emisarioRef.skills[self.skillData.id] ?? 0
+
+          if let prereqID = self.skillData.prereqID {
+            if (self.emisarioRef.skills[prereqID] ?? 0) == 0 {
+              panic("Prerequisite skill '".concat(prereqID).concat("' not unlocked."))
+            }
+          }
+
+          // Check if the skill is already at max level
+          if currentSkillLevel >= self.skillData.maxLevel {
+            panic("Skill is already at max level.")
+          }
+
+          // Spend the skill point
+          self.emisarioRef.skillPoints = self.emisarioRef.skillPoints - 1
+
+          // Increase the skill level
+          self.emisarioRef.skills[self.skillData.id] = currentSkillLevel + 1
+        }
+      }
+    `;
+
+    return c.json({
+      success: true,
+      data: {
+        transactionCode,
+        args: [skillID],
+        message: "Execute this transaction with your wallet to unlock the skill"
+      },
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: `Failed to prepare skill unlock: ${error instanceof Error ? error.message : 'Unknown error'}`,
       timestamp: Date.now()
     }, 500);
   }

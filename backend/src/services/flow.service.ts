@@ -72,16 +72,40 @@ export class FlowService {
   }
 
   /**
-   * Otorga XP a un usuario
+   * Otorga XP a un usuario (operación administrativa)
    */
-  async grantXP(userAddress: string, amount: number): Promise<FlowTransaction> {
+  async grantXP(recipientAddress: string, amount: number): Promise<FlowTransaction> {
     try {
       const transactionCode = `
-        import UserContract from ${this.getUserContractAddress()}
+        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
 
-        transaction(userAddress: Address, amount: UInt64) {
-          prepare(oracle: AuthAccount) {
-            UserContract.grantXP(userAddress: userAddress, amount: amount)
+        transaction(recipientAddress: Address, xpAmount: UFix64) {
+          prepare(admin: auth(Storage) &Account) {
+            // For MVP: Admin grants XP to themselves for testing
+            // In production, this would use oracle capabilities
+            
+            // Check if the admin is granting XP to themselves (MVP approach)
+            if admin.address != recipientAddress {
+              panic("For MVP: Admin must grant XP to themselves. Production version would use oracle capabilities.")
+            }
+            
+            let emisarioRef = admin.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+              ?? panic("Emisario resource not found. Please run setup_account.cdc first")
+              
+            // Grant XP
+            emisarioRef.xp = emisarioRef.xp + xpAmount
+            
+            // Check for level up
+            let newLevel = emisarioRef.level
+            let requiredXP = UFix64(newLevel * newLevel * 100) // Simple level formula
+            
+            while emisarioRef.xp >= requiredXP {
+              newLevel = newLevel + 1
+              emisarioRef.skillPoints = emisarioRef.skillPoints + 1
+              requiredXP = UFix64(newLevel * newLevel * 100)
+            }
+            
+            emisarioRef.level = newLevel
           }
         }
       `;
@@ -89,8 +113,8 @@ export class FlowService {
       const response = await fcl.mutate({
         cadence: transactionCode,
         args: (arg: any, t: any) => [
-          arg(userAddress, t.Address),
-          arg(amount.toString(), t.UInt64)
+          arg(recipientAddress, t.Address),
+          arg(amount.toFixed(1), t.UFix64)
         ],
         authorizations: [this.oracleAuthorization.bind(this)],
         payer: this.oracleAuthorization.bind(this),
@@ -98,15 +122,83 @@ export class FlowService {
         limit: 1000
       });
 
-      const transactionId = response;
-
       return {
-        transactionId: transactionId,
+        transactionId: response,
         status: 'pending'
       };
     } catch (error) {
       console.error('Error granting XP:', error);
       throw new Error(`Failed to grant XP: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Registra una nueva skill (operación administrativa)
+   */
+  async registerSkill(skillData: {
+    id: string;
+    branch: string;
+    maxLevel: number;
+    levelRequirement: number;
+    prereqID?: string;
+    description: string;
+  }): Promise<FlowTransaction> {
+    try {
+      const transactionCode = `
+        import SkillRegistry from ${this.getClandestineNetworkAddress()}
+
+        transaction(
+          id: String,
+          branch: String,
+          maxLevel: UInt8,
+          levelRequirement: UInt64,
+          prereqID: String?,
+          description: String
+        ) {
+          let adminRef: &SkillRegistry.Admin
+
+          prepare(adminAcct: auth(Storage) &Account) {
+            self.adminRef = adminAcct.storage.borrow<&SkillRegistry.Admin>(from: /storage/SkillRegistryAdmin)
+              ?? panic("Could not borrow a reference to the SkillRegistry Admin resource.")
+          }
+
+          execute {
+            let newData = SkillRegistry.SkillData(
+              id: id,
+              branch: branch,
+              maxLevel: maxLevel,
+              levelRequirement: levelRequirement,
+              prereqID: prereqID,
+              description: description
+            )
+            self.adminRef.registerSkill(data: newData)
+          }
+        }
+      `;
+
+      const response = await fcl.mutate({
+        cadence: transactionCode,
+        args: (arg: any, t: any) => [
+          arg(skillData.id, t.String),
+          arg(skillData.branch, t.String),
+          arg(skillData.maxLevel, t.UInt8),
+          arg(skillData.levelRequirement.toString(), t.UInt64),
+          arg(skillData.prereqID || null, t.Optional(t.String)),
+          arg(skillData.description, t.String)
+        ],
+        authorizations: [this.oracleAuthorization.bind(this)],
+        payer: this.oracleAuthorization.bind(this),
+        proposer: this.oracleAuthorization.bind(this),
+        limit: 1000
+      });
+
+      return {
+        transactionId: response,
+        status: 'pending'
+      };
+    } catch (error) {
+      console.error('Error registering skill:', error);
+      throw new Error(`Failed to register skill: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
