@@ -1,6 +1,15 @@
 import * as fcl from '@onflow/fcl';
 import { config } from '../config';
 import { FlowTransaction, BondEvolvedEvent, Bond } from '../types';
+import { FLOW_CONFIG, generateImports } from '../config/contracts';
+
+// V2 Storage Paths - Using specific paths to avoid collisions
+const STORAGE_PATHS = {
+  EMISARIO_STORAGE: '/storage/ClandestineEmisarioV2',
+  EMISARIO_PUBLIC: '/public/ClandestineEmisarioV2',
+  CLAIM_COLLECTION_STORAGE: '/storage/ClandestineClaimCollectionV2',
+  CLAIM_COLLECTION_PUBLIC: '/public/ClandestineClaimCollectionV2'
+};
 
 export class FlowService {
   private initialized = false;
@@ -77,7 +86,7 @@ export class FlowService {
   async grantXP(recipientAddress: string, amount: number): Promise<FlowTransaction> {
     try {
       const transactionCode = `
-        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
+        ${generateImports(['CLANDESTINE_NETWORK'])}
 
         transaction(recipientAddress: Address, xpAmount: UFix64) {
           prepare(admin: auth(Storage) &Account) {
@@ -89,7 +98,7 @@ export class FlowService {
               panic("For MVP: Admin must grant XP to themselves. Production version would use oracle capabilities.")
             }
             
-            let emisarioRef = admin.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+            let emisarioRef = admin.storage.borrow<&${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.Emisario>(from: ${STORAGE_PATHS.EMISARIO_STORAGE})
               ?? panic("Emisario resource not found. Please run setup_account.cdc first")
               
             // Grant XP
@@ -145,7 +154,7 @@ export class FlowService {
   }): Promise<FlowTransaction> {
     try {
       const transactionCode = `
-        import SkillRegistry from ${this.getClandestineNetworkAddress()}
+        ${generateImports(['SKILL_REGISTRY'])}
 
         transaction(
           id: String,
@@ -319,34 +328,39 @@ export class FlowService {
   }
 
   /**
-   * Crea un nuevo Emisario en la blockchain
+   * Crea un Emisario para un usuario
    */
   async createEmisario(userAddress: string): Promise<FlowTransaction> {
     try {
       const transactionCode = `
-        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
+        ${generateImports(['CLANDESTINE_NETWORK', 'NON_FUNGIBLE_TOKEN'])}
 
-        transaction {
-          prepare(signer: auth(Storage, Capabilities) &Account) {
-            // Check if account already has an Emisario
-            if signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath) != nil {
-              panic("Account already has an Emisario")
-            }
-
-            // Create new Emisario
-            let newEmisario <- ClandestineNetwork.createEmisario()
+        transaction(userAddress: Address) {
+          prepare(admin: auth(Storage) &Account) {
+            // For MVP: Admin creates an Emisario for the user
+            // In production, users would create their own Emisario
             
-            // Store it in the account
-            signer.storage.save(<-newEmisario, to: ClandestineNetwork.EmisarioStoragePath)
+            // Create new Emisario V2
+            let newEmisario <- ${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.createEmisario()
+            
+            // Get the target user's account
+            let userAccount = getAccount(userAddress)
+            
+            // Store it in the user's account using V2 path
+            userAccount.storage.save(<-newEmisario, to: ${STORAGE_PATHS.EMISARIO_STORAGE})
+            
+            // Create a public capability for the Emisario
+            let emisarioPublicCap = userAccount.capabilities.storage.issue<&{${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.EmisarioPublic}>(${STORAGE_PATHS.EMISARIO_STORAGE})
+            userAccount.capabilities.publish(emisarioPublicCap, at: ${STORAGE_PATHS.EMISARIO_PUBLIC})
             
             // Create ClaimTicket collection if it doesn't exist
-            if signer.storage.borrow<&ClandestineNetwork.Collection>(from: ClandestineNetwork.ClaimCollectionStoragePath) == nil {
-              let collection <- ClandestineNetwork.createEmptyCollection()
-              signer.storage.save(<-collection, to: ClandestineNetwork.ClaimCollectionStoragePath)
+            if userAccount.storage.borrow<&${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.Collection>(from: ${STORAGE_PATHS.CLAIM_COLLECTION_STORAGE}) == nil {
+              let collection <- ${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.createEmptyCollection()
+              userAccount.storage.save(<-collection, to: ${STORAGE_PATHS.CLAIM_COLLECTION_STORAGE})
               
               // Create a public capability for the collection
-              let cap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionStoragePath)
-              signer.capabilities.publish(cap, at: ClandestineNetwork.ClaimCollectionPublicPath)
+              let collectionCap = userAccount.capabilities.storage.issue<&{NonFungibleToken.Collection}>(${STORAGE_PATHS.CLAIM_COLLECTION_STORAGE})
+              userAccount.capabilities.publish(collectionCap, at: ${STORAGE_PATHS.CLAIM_COLLECTION_PUBLIC})
             }
           }
         }
@@ -354,10 +368,12 @@ export class FlowService {
 
       const response = await fcl.mutate({
         cadence: transactionCode,
-        args: () => [],
-        authorizations: [this.createAuthorizationFunction(userAddress)],
+        args: (arg: any, t: any) => [
+          arg(userAddress, t.Address)
+        ],
+        authorizations: [this.oracleAuthorization.bind(this)],
         payer: this.oracleAuthorization.bind(this),
-        proposer: this.createAuthorizationFunction(userAddress),
+        proposer: this.oracleAuthorization.bind(this),
         limit: 1000
       });
 
@@ -372,33 +388,37 @@ export class FlowService {
   }
 
   /**
-   * Configura la clave pública de cifrado de un usuario
+   * Establece la clave pública de un usuario
    */
   async setPublicKey(userAddress: string, publicKey: string): Promise<FlowTransaction> {
     try {
       const transactionCode = `
-        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
+        ${generateImports(['CLANDESTINE_NETWORK'])}
 
-        transaction(newPublicKey: String) {
-          let emisarioRef: &ClandestineNetwork.Emisario
-
-          prepare(signer: auth(Storage) &Account) {
-            self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-              ?? panic("Emisario resource not found. Please run setup_account.cdc first")
-          }
-
-          execute {
-            self.emisarioRef.setPublicKey(newKey: newPublicKey)
+        transaction(userAddress: Address, newPublicKey: String) {
+          prepare(admin: auth(Storage) &Account) {
+            // For MVP: Admin sets the public key for the user
+            // In production, users would set their own public key
+            
+            let userAccount = getAccount(userAddress)
+            let emisarioRef = userAccount.storage.borrow<&${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.Emisario>(from: ${STORAGE_PATHS.EMISARIO_STORAGE})
+              ?? panic("Emisario resource not found. Please create Emisario first")
+              
+            emisarioRef.setPublicKey(newKey: newPublicKey)
+            log("Public encryption key has been set/updated successfully.")
           }
         }
       `;
 
       const response = await fcl.mutate({
         cadence: transactionCode,
-        args: (arg: any, t: any) => [arg(publicKey, t.String)],
-        authorizations: [this.createAuthorizationFunction(userAddress)],
-        payer: this.createAuthorizationFunction(userAddress),
-        proposer: this.createAuthorizationFunction(userAddress),
+        args: (arg: any, t: any) => [
+          arg(userAddress, t.Address),
+          arg(publicKey, t.String)
+        ],
+        authorizations: [this.oracleAuthorization.bind(this)],
+        payer: this.oracleAuthorization.bind(this),
+        proposer: this.oracleAuthorization.bind(this),
         limit: 1000
       });
 
@@ -413,47 +433,43 @@ export class FlowService {
   }
 
   /**
-   * Crea un bond entre dos usuarios
+   * Crea un vínculo entre dos usuarios
    */
   async forgeBond(initiatorAddress: string, partnerAddress: string): Promise<FlowTransaction> {
     try {
       const transactionCode = `
-        import ClandestineNetwork from ${this.getClandestineNetworkAddress()}
-        import NonFungibleToken from 0x1d7e57aa55817448
+        ${generateImports(['CLANDESTINE_NETWORK', 'NON_FUNGIBLE_TOKEN'])}
 
-        transaction(partnerAddress: Address) {
-          let initiatorEmisarioRef: &ClandestineNetwork.Emisario
-          let initiatorCollectionRef: &{NonFungibleToken.Collection}
-          let partnerCollectionCap: Capability<&{NonFungibleToken.Collection}>
-
-          prepare(initiator: auth(Storage, Capabilities) &Account) {
-            self.initiatorEmisarioRef = initiator.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-              ?? panic("Initiator's Emisario resource not found. Please run setup_account.cdc")
-
-            self.initiatorCollectionRef = initiator.storage.borrow<&{NonFungibleToken.Collection}>(from: ClandestineNetwork.ClaimCollectionStoragePath)
-              ?? panic("Initiator's ClaimTicket Collection not found. Please run setup_account.cdc")
-
-            self.partnerCollectionCap = getAccount(partnerAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
+        transaction(initiatorAddress: Address, partnerAddress: Address) {
+          prepare(admin: auth(Storage) &Account) {
+            // For MVP: Admin creates a bond between two users
+            // In production, the initiator would create the bond
             
-            if !self.partnerCollectionCap.check() {
-              panic("Partner's ClaimTicket Collection capability is not valid or has not been published.")
-            }
-          }
-
-          execute {
-            let tickets <- ClandestineNetwork.forgeBondSimple(
-              emisario1: self.initiatorEmisarioRef,
-              owner1: self.initiatorEmisarioRef.owner!.address,
+            let initiatorAccount = getAccount(initiatorAddress)
+            let partnerAccount = getAccount(partnerAddress)
+            
+            // Get references to both users' collections
+            let initiatorCollection = initiatorAccount.storage.borrow<&${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.Collection>(from: ${STORAGE_PATHS.CLAIM_COLLECTION_STORAGE})
+              ?? panic("Initiator does not have a ClaimTicket collection.")
+              
+            let partnerCollection = partnerAccount.storage.borrow<&${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.Collection>(from: ${STORAGE_PATHS.CLAIM_COLLECTION_STORAGE})
+              ?? panic("Partner does not have a ClaimTicket collection.")
+              
+            // Get the initiator's Emisario
+            let initiatorEmisario = initiatorAccount.storage.borrow<&${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.Emisario>(from: ${STORAGE_PATHS.EMISARIO_STORAGE})
+              ?? panic("Initiator does not have an Emisario resource.")
+              
+            // Create the bond
+            let tickets <- ${FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK}.forgeBondSimple(
+              emisario1: initiatorEmisario,
+              owner1: initiatorAddress,
               owner2: partnerAddress
             )
-
-            // Distribute the Claim Tickets
-            let partnerCollection = self.partnerCollectionCap.borrow()
-              ?? panic("Could not borrow partner's collection.")
+            
+            // Distribute tickets
             partnerCollection.deposit(token: <- tickets.removeFirst())
-
-            self.initiatorCollectionRef.deposit(token: <- tickets.removeFirst())
-
+            initiatorCollection.deposit(token: <- tickets.removeFirst())
+            
             destroy tickets
           }
         }
@@ -461,10 +477,13 @@ export class FlowService {
 
       const response = await fcl.mutate({
         cadence: transactionCode,
-        args: (arg: any, t: any) => [arg(partnerAddress, t.Address)],
-        authorizations: [this.createAuthorizationFunction(initiatorAddress)],
-        payer: this.createAuthorizationFunction(initiatorAddress),
-        proposer: this.createAuthorizationFunction(initiatorAddress),
+        args: (arg: any, t: any) => [
+          arg(initiatorAddress, t.Address),
+          arg(partnerAddress, t.Address)
+        ],
+        authorizations: [this.oracleAuthorization.bind(this)],
+        payer: this.oracleAuthorization.bind(this),
+        proposer: this.oracleAuthorization.bind(this),
         limit: 1000
       });
 
@@ -478,32 +497,7 @@ export class FlowService {
     }
   }
 
-  /**
-   * Crea una función de autorización para una dirección específica
-   */
-  private createAuthorizationFunction(address: string) {
-    return async (account: any) => {
-      return {
-        ...account,
-        addr: address,
-        keyId: 0,
-        signingFunction: async (signable: any) => {
-          // En un frontend real, esto sería manejado por el wallet del usuario
-          // Aquí simulamos para el backend
-          return {
-            signature: 'user_signature',
-            keyId: 0,
-            addr: address
-          };
-        }
-      };
-    };
-  }
-
-  /**
-   * Obtiene la dirección del contrato ClandestineNetwork
-   */
   private getClandestineNetworkAddress(): string {
-    return config.flow.oracleAddress; // Usamos la misma dirección donde desplegamos
+    return FLOW_CONFIG.ADDRESSES.TESTNET.DEPLOYER;
   }
 }

@@ -59,8 +59,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // TODO: Encrypt content properly
-      const encryptedContent = btoa(content); // Basic encoding for MVP
+      // Obtener la clave pública del destinatario desde blockchain
+      const { FlowService } = await import('../services/flowService');
+      const recipientPublicKey = await FlowService.getPublicKey(recipientAddress);
+      
+      if (!recipientPublicKey) {
+        throw new Error('Recipient public key not found. User may not be registered.');
+      }
+      
+      // Encriptar el mensaje con la clave pública del destinatario
+      const { CryptoService } = await import('../services/cryptoService');
+      const encryptedContent = await CryptoService.encryptMessage(content, recipientPublicKey);
       
       const response = await fetch(`${API_BASE_URL}/api/messages`, {
         method: 'POST',
@@ -99,11 +108,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const result = await response.json();
       
       if (result.success) {
-        // TODO: Decrypt messages properly
-        const decryptedMessages = result.data.map((msg: Message) => ({
-          ...msg,
-          content: atob(msg.encryptedContent) // Basic decoding for MVP
-        }));
+        // Desencriptar mensajes usando la clave privada propia
+        const { CryptoService } = await import('../services/cryptoService');
+        const decryptedMessages = await Promise.all(
+          result.data.map(async (msg: Message) => {
+            try {
+              const decryptedContent = await CryptoService.decryptMessage(msg.encryptedContent, userAddress);
+              return {
+                ...msg,
+                content: decryptedContent
+              };
+            } catch (decryptError) {
+              console.error('Error decrypting message:', decryptError);
+              return {
+                ...msg,
+                content: '[Error: No se pudo desencriptar el mensaje]'
+              };
+            }
+          })
+        );
         
         set({ messages: decryptedMessages, isLoading: false });
       } else {

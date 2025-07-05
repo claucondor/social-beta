@@ -34,6 +34,7 @@ export interface ConversationMessage {
 export interface User {
   address: string;
   displayName?: string;
+  country?: string;
   publicKey?: string;
   joinedAt: number;
   totalBonds: number;
@@ -45,6 +46,7 @@ export interface User {
 export interface UserRegistration {
   address: string;
   displayName?: string;
+  country?: string;
   publicKey?: string;
 }
 

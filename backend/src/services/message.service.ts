@@ -236,13 +236,15 @@ export class MessageService {
   async createUser(
     address: string,
     displayName?: string,
+    country?: string,
     publicKey?: string
-  ): Promise<ApiResponse<{ address: string; displayName?: string }>> {
+  ): Promise<ApiResponse<{ address: string; displayName?: string; country?: string }>> {
     try {
       const now = Date.now();
       const userData = {
         address,
         displayName: displayName || `Emisario_${address.slice(-6)}`,
+        country: country || '',
         publicKey: publicKey || '',
         joinedAt: now,
         totalBonds: 0,
@@ -260,7 +262,8 @@ export class MessageService {
         success: true,
         data: {
           address: userData.address,
-          displayName: userData.displayName
+          displayName: userData.displayName,
+          country: userData.country
         },
         timestamp: now
       };

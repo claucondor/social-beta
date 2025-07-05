@@ -1,7 +1,7 @@
 import "NonFungibleToken"
 import "MetadataViews"
 
-// ClandestineNetwork.cdc
+// ClandestineNetworkV2.cdc
 //
 // This contract manages the core logic for "The Emissaries' Bond" game.
 // It is responsible for:
@@ -10,7 +10,7 @@ import "MetadataViews"
 // - Handling the on-chain representation of the User Skill Tree.
 // - Managing co-ownership of Bonds via a central Vault and Claim Ticket NFTs.
 
-access(all) contract ClandestineNetwork {
+access(all) contract ClandestineNetworkV2 {
 
     // --- Events ---
     access(all) event ContractInitialized()
@@ -74,7 +74,7 @@ access(all) contract ClandestineNetwork {
         // Public function to allow the owner to update their encryption key.
         access(all) fun setPublicKey(newKey: String) {
             self.encryptionPubKey = newKey
-            emit ClandestineNetwork.EmisarioPublicKeyUpdated(emisarioID: self.id, newPublicKey: newKey)
+            emit ClandestineNetworkV2.EmisarioPublicKeyUpdated(emisarioID: self.id, newPublicKey: newKey)
         }
 
         // Public function to read the encryption public key
@@ -135,7 +135,7 @@ access(all) contract ClandestineNetwork {
         }
 
         access(all) fun createEmptyCollection(): @{NonFungibleToken.Collection} {
-            return <- ClandestineNetwork.createEmptyCollection()
+            return <- ClandestineNetworkV2.createEmptyCollection()
         }
     }
 
@@ -200,8 +200,8 @@ access(all) contract ClandestineNetwork {
     }
 
     access(all) fun createEmisario(): @Emisario {
-        ClandestineNetwork.totalEmisarios = ClandestineNetwork.totalEmisarios + 1
-        let newEmisario <- create Emisario(id: ClandestineNetwork.totalEmisarios)
+        ClandestineNetworkV2.totalEmisarios = ClandestineNetworkV2.totalEmisarios + 1
+        let newEmisario <- create Emisario(id: ClandestineNetworkV2.totalEmisarios)
         // Don't emit event here since owner is not set yet
         // Event will be emitted when resource is stored in transaction
         return <- newEmisario
@@ -212,7 +212,7 @@ access(all) contract ClandestineNetwork {
         let bondID = self.totalBonds
         let newBond <- create Vinculo(id: bondID, emisario1: emisario1, emisario2: emisario2, owner1: owner1, owner2: owner2)
 
-        let vaultRef = self.account.storage.borrow<auth(Mutate) &BondVault>(from: /storage/ClandestineBondVault)
+        let vaultRef = self.account.storage.borrow<auth(Mutate) &BondVault>(from: /storage/ClandestineBondVaultV2)
             ?? panic("BondVault not found!")
         vaultRef.add(bond: <-newBond)
 
@@ -241,7 +241,7 @@ access(all) contract ClandestineNetwork {
             owner2: owner2
         )
 
-        let vaultRef = self.account.storage.borrow<auth(Mutate) &BondVault>(from: /storage/ClandestineBondVault)
+        let vaultRef = self.account.storage.borrow<auth(Mutate) &BondVault>(from: /storage/ClandestineBondVaultV2)
             ?? panic("BondVault not found!")
         vaultRef.add(bond: <-newBond)
 
@@ -257,7 +257,7 @@ access(all) contract ClandestineNetwork {
     }
     
     access(all) view fun borrowVinculo(id: UInt64): &Vinculo? {
-        let vaultRef = self.account.storage.borrow<&BondVault>(from: /storage/ClandestineBondVault)
+        let vaultRef = self.account.storage.borrow<&BondVault>(from: /storage/ClandestineBondVaultV2)
             ?? panic("BondVault not found!")
         return vaultRef.bonds[id]
     }
@@ -278,13 +278,13 @@ access(all) contract ClandestineNetwork {
     init() {
         self.totalBonds = 0
         self.totalEmisarios = 0
-        self.EmisarioStoragePath = /storage/ClandestineEmisario
-        self.EmisarioPublicPath = /public/ClandestineEmisario
-        self.ClaimCollectionStoragePath = /storage/ClandestineClaimCollection
-        self.ClaimCollectionPublicPath = /public/ClandestineClaimCollection
+        self.EmisarioStoragePath = /storage/ClandestineEmisarioV2
+        self.EmisarioPublicPath = /public/ClandestineEmisarioV2
+        self.ClaimCollectionStoragePath = /storage/ClandestineClaimCollectionV2
+        self.ClaimCollectionPublicPath = /public/ClandestineClaimCollectionV2
 
         // Initialize the BondVault and store it in the contract account's storage.
-        self.account.storage.save(<-create BondVault(), to: /storage/ClandestineBondVault)
+        self.account.storage.save(<-create BondVault(), to: /storage/ClandestineBondVaultV2)
 
         // The NonFungibleToken standard requires a `totalSupply` field, but we are using ClaimTickets.
         // We will manage `totalSupply` of ClaimTickets manually if needed, or ignore if not required

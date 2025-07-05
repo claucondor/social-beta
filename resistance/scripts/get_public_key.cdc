@@ -3,12 +3,15 @@
 // This script attempts to read the public encryption key of a specified user.
 // Note: Currently returns nil as public key access is not implemented.
 
-import "ClandestineNetwork"
+import ClandestineNetworkV2 from 0x2444e6b4d9327f09
 
 access(all) fun main(userAddress: Address): String? {
-    // The getEmisarioPublicKey function currently returns nil for privacy
-    // In the future, this could be implemented with public capabilities
-    let publicKey = ClandestineNetwork.getEmisarioPublicKey(address: userAddress)
+    let account = getAccount(userAddress)
     
-    return publicKey // Will be nil until public capabilities are implemented
+    // Try V2 first 
+    if let emisarioRef = account.capabilities.get<&{ClandestineNetworkV2.EmisarioPublic}>(/public/ClandestineEmisarioV2).borrow() {
+        return emisarioRef.encryptionPubKey.length > 0 ? emisarioRef.encryptionPubKey : nil
+    }
+    
+    return nil
 } 

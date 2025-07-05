@@ -10,6 +10,7 @@ const DashboardPage: React.FC = () => {
   const [showRegistration, setShowRegistration] = useState(false);
   const [showNewBond, setShowNewBond] = useState(false);
   const [displayName, setDisplayName] = useState('');
+  const [country, setCountry] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -31,10 +32,11 @@ const DashboardPage: React.FC = () => {
 
   const handleRegister = async () => {
     if (user?.address) {
-      const success = await registerUser(displayName || undefined);
+      const success = await registerUser(displayName || undefined, country || undefined);
       if (success) {
         setShowRegistration(false);
         setDisplayName('');
+        setCountry('');
       }
     }
   };
@@ -268,18 +270,66 @@ const DashboardPage: React.FC = () => {
             >
               <h2 className="text-2xl font-orbitron mb-4">Bienvenido, Emisario</h2>
               <p className="mb-6 opacity-80">
-                Para unirte a la resistencia, necesitas registrar tu identidad en la blockchain de Flow.
+                Para unirte a la resistencia, necesitas registrar tu identidad en la blockchain de Flow y generar tus claves de encriptación.
               </p>
               
-              <div className="mb-6">
-                <label className="block text-sm mb-2">Nombre de Emisario (opcional)</label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Ej: CorrespondenteSombra"
-                  className="w-full px-4 py-2 bg-black/50 border border-matrix-green/30 focus:border-matrix-green/60 outline-none"
-                />
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm mb-2">Nombre de Emisario</label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Ej: CorrespondenteSombra"
+                    className="w-full px-4 py-2 bg-black/50 border border-matrix-green/30 focus:border-matrix-green/60 outline-none"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">Opcional - Tu alias en la red clandestina</div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm mb-2">País de Origen</label>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className="w-full px-4 py-2 bg-black/50 border border-matrix-green/30 focus:border-matrix-green/60 outline-none"
+                  >
+                    <option value="">Seleccionar país...</option>
+                    <option value="AR">Argentina</option>
+                    <option value="BO">Bolivia</option>
+                    <option value="BR">Brasil</option>
+                    <option value="CL">Chile</option>
+                    <option value="CO">Colombia</option>
+                    <option value="CR">Costa Rica</option>
+                    <option value="CU">Cuba</option>
+                    <option value="DO">República Dominicana</option>
+                    <option value="EC">Ecuador</option>
+                    <option value="SV">El Salvador</option>
+                    <option value="GT">Guatemala</option>
+                    <option value="HN">Honduras</option>
+                    <option value="MX">México</option>
+                    <option value="NI">Nicaragua</option>
+                    <option value="PA">Panamá</option>
+                    <option value="PY">Paraguay</option>
+                    <option value="PE">Perú</option>
+                    <option value="PR">Puerto Rico</option>
+                    <option value="UY">Uruguay</option>
+                    <option value="VE">Venezuela</option>
+                    <option value="ES">España</option>
+                    <option value="US">Estados Unidos</option>
+                    <option value="OTHER">Otro</option>
+                  </select>
+                  <div className="text-xs text-gray-500 mt-1">Opcional - Para estadísticas de la red</div>
+                </div>
+              </div>
+              
+              <div className="mb-4 p-3 border border-yellow-500/30 bg-yellow-500/10 rounded">
+                <div className="text-xs text-yellow-400 mb-2">⚡ Proceso de Registro:</div>
+                <div className="text-xs text-gray-300 space-y-1">
+                  <div>1. Generar claves de encriptación</div>
+                  <div>2. Crear Emisario en blockchain</div>
+                  <div>3. Guardar clave pública on-chain</div>
+                  <div>4. Registrar datos en backend</div>
+                </div>
               </div>
               
               <div className="flex space-x-4">
@@ -287,7 +337,7 @@ const DashboardPage: React.FC = () => {
                   onClick={handleRegister}
                   className="flex-1 py-3 bg-matrix-green/20 border border-matrix-green/50 hover:bg-matrix-green/30 transition-colors"
                 >
-                  Registrar en Blockchain
+                  Completar Registro
                 </button>
               </div>
             </motion.div>

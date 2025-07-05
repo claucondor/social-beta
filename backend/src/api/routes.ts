@@ -6,6 +6,7 @@ import { MessageService } from '../services/message.service';
 import { SchedulerService } from '../services/scheduler.service';
 import { FlowService } from '../services/flow.service';
 import { IAService } from '../services/ia.service';
+import { FLOW_CONFIG, generateImports } from '../config/contracts';
 
 const app = new Hono();
 
@@ -23,6 +24,17 @@ const messageService = new MessageService();
 const schedulerService = new SchedulerService();
 const flowService = new FlowService();
 const iaService = new IAService();
+
+// Helper para generar código de transacciones
+const contractName = FLOW_CONFIG.CONTRACTS.CLANDESTINE_NETWORK;
+
+// V2 Storage Paths - Using specific paths to avoid collisions
+const STORAGE_PATHS = {
+  EMISARIO_STORAGE: '/storage/ClandestineEmisarioV2',
+  EMISARIO_PUBLIC: '/public/ClandestineEmisarioV2',
+  CLAIM_COLLECTION_STORAGE: '/storage/ClandestineClaimCollectionV2',
+  CLAIM_COLLECTION_PUBLIC: '/public/ClandestineClaimCollectionV2'
+};
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -330,7 +342,7 @@ app.get('/api/docs', (c) => {
     endpoints: {
       health: 'GET /health - Health check',
       users: {
-        register: 'POST /api/users/register - Register new user and create Emisario',
+        register: 'POST /api/users/register - Register new user with name and country',
         get: 'GET /api/users/:address - Get user information',
         updatePublicKey: 'PUT /api/users/:address/public-key - Update user public encryption key',
         search: 'GET /api/users/search?q=query - Search users by name or address'
@@ -369,6 +381,7 @@ app.get('/api/docs', (c) => {
         body: {
           address: '0x1234567890abcdef',
           displayName: 'Mi Nombre Emisario',
+          country: 'MX',
           publicKey: 'optional_encryption_key'
         }
       },
@@ -397,7 +410,7 @@ app.get('/api/docs', (c) => {
 app.post('/api/users/register', async (c) => {
   try {
     const body = await c.req.json();
-    const { address, displayName, publicKey } = body;
+    const { address, displayName, country, publicKey } = body;
 
     if (!address) {
       return c.json({
@@ -407,44 +420,20 @@ app.post('/api/users/register', async (c) => {
     }
 
     // Store user data in Firestore (backend responsibility)
-    const user = await messageService.createUser(address, displayName, publicKey);
+    const result = await messageService.createUser(address, displayName, country, publicKey);
 
-    // Return transaction code for frontend to execute
-    const transactionCode = `
-      import ClandestineNetwork from 0x2444e6b4d9327f09
-
-      transaction {
-        prepare(signer: auth(Storage, Capabilities) &Account) {
-          // Check if account already has an Emisario
-          if signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath) != nil {
-            panic("Account already has an Emisario")
-          }
-
-          // Create new Emisario
-          let newEmisario <- ClandestineNetwork.createEmisario()
-          
-          // Store it in the account
-          signer.storage.save(<-newEmisario, to: ClandestineNetwork.EmisarioStoragePath)
-          
-          // Create ClaimTicket collection if it doesn't exist
-          if signer.storage.borrow<&ClandestineNetwork.Collection>(from: ClandestineNetwork.ClaimCollectionStoragePath) == nil {
-            let collection <- ClandestineNetwork.createEmptyCollection()
-            signer.storage.save(<-collection, to: ClandestineNetwork.ClaimCollectionStoragePath)
-            
-            // Create a public capability for the collection
-            let cap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionStoragePath)
-            signer.capabilities.publish(cap, at: ClandestineNetwork.ClaimCollectionPublicPath)
-          }
-        }
-      }
-    `;
+    if (!result.success) {
+      return c.json({
+        success: false,
+        error: result.error
+      }, 500);
+    }
 
     return c.json({
       success: true,
       data: {
-        user,
-        transactionCode, // Frontend ejecuta esto
-        message: "Execute the transaction with your wallet to create your Emisario on-chain"
+        user: result.data,
+        message: "User registered successfully in backend database"
       },
       timestamp: Date.now()
     });
@@ -501,28 +490,29 @@ app.put('/api/users/:address/public-key', async (c) => {
 
     // Return transaction code for frontend to execute
     const transactionCode = `
-      import ClandestineNetwork from 0x2444e6b4d9327f09
+      ${generateImports(['CLANDESTINE_NETWORK'])}
 
       transaction(newPublicKey: String) {
-        let emisarioRef: &ClandestineNetwork.Emisario
+        let emisarioRef: &${contractName}.Emisario
 
         prepare(signer: auth(Storage) &Account) {
-          self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+          self.emisarioRef = signer.storage.borrow<&${contractName}.Emisario>(from: ${STORAGE_PATHS.EMISARIO_STORAGE})
             ?? panic("Emisario resource not found. Please run setup_account.cdc first")
         }
 
         execute {
           self.emisarioRef.setPublicKey(newKey: newPublicKey)
+          log("Public encryption key has been set/updated successfully.")
         }
       }
     `;
 
     return c.json({
       success: true,
-      data: { 
+      data: {
         transactionCode,
         args: [publicKey],
-        message: "Execute this transaction with your wallet to update your public key on-chain"
+        message: "Execute this transaction with your wallet to set your public key"
       },
       timestamp: Date.now()
     });
@@ -578,37 +568,29 @@ app.post('/api/bonds/create', async (c) => {
 
     // Return transaction code for frontend to execute
     const transactionCode = `
-      import ClandestineNetwork from 0x2444e6b4d9327f09
-      import NonFungibleToken from 0x1d7e57aa55817448
+      ${generateImports(['CLANDESTINE_NETWORK', 'NON_FUNGIBLE_TOKEN'])}
 
       transaction(partnerAddress: Address) {
-        let initiatorEmisarioRef: &ClandestineNetwork.Emisario
-        let initiatorCollectionRef: &{NonFungibleToken.Collection}
-        let partnerCollectionCap: Capability<&{NonFungibleToken.Collection}>
+        let initiatorCollectionRef: &${contractName}.Collection
+        let initiatorEmisarioRef: &${contractName}.Emisario
 
-        prepare(initiator: auth(Storage, Capabilities) &Account) {
-          self.initiatorEmisarioRef = initiator.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-            ?? panic("Initiator's Emisario resource not found. Please run setup_account.cdc")
+        prepare(signer: auth(Storage) &Account) {
+          self.initiatorCollectionRef = signer.storage.borrow<&${contractName}.Collection>(from: ${STORAGE_PATHS.CLAIM_COLLECTION_STORAGE})
+            ?? panic("Initiator does not have a ClaimTicket collection.")
 
-          self.initiatorCollectionRef = initiator.storage.borrow<&{NonFungibleToken.Collection}>(from: ClandestineNetwork.ClaimCollectionStoragePath)
-            ?? panic("Initiator's ClaimTicket Collection not found. Please run setup_account.cdc")
-
-          self.partnerCollectionCap = getAccount(partnerAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
-          
-          if !self.partnerCollectionCap.check() {
-            panic("Partner's ClaimTicket Collection capability is not valid or has not been published.")
-          }
+          self.initiatorEmisarioRef = signer.storage.borrow<&${contractName}.Emisario>(from: ${STORAGE_PATHS.EMISARIO_STORAGE})
+            ?? panic("Initiator does not have an Emisario resource.")
         }
 
         execute {
-          let tickets <- ClandestineNetwork.forgeBondSimple(
+          let tickets <- ${contractName}.forgeBondSimple(
             emisario1: self.initiatorEmisarioRef,
-            owner1: self.initiatorEmisarioRef.owner!.address,
+            owner1: self.initiatorCollectionRef.owner!.address,
             owner2: partnerAddress
           )
 
-          // Distribute the Claim Tickets
-          let partnerCollection = self.partnerCollectionCap.borrow()
+          let partnerAccount = getAccount(partnerAddress)
+          let partnerCollection = partnerAccount.capabilities.get<&{NonFungibleToken.Collection}>(${STORAGE_PATHS.CLAIM_COLLECTION_PUBLIC}).borrow()
             ?? panic("Could not borrow partner's collection.")
           partnerCollection.deposit(token: <- tickets.removeFirst())
 
@@ -643,7 +625,7 @@ app.post('/api/bonds/create', async (c) => {
 app.post('/api/admin/grant-xp', async (c) => {
   try {
     const body = await c.req.json();
-    const { recipientAddress, amount, reason } = body;
+    const { recipientAddress, amount } = body;
 
     if (!recipientAddress || !amount) {
       return c.json({
@@ -653,7 +635,7 @@ app.post('/api/admin/grant-xp', async (c) => {
     }
 
     // This is executed by the backend with oracle privileges
-    const transaction = await flowService.grantXP(recipientAddress, amount, reason);
+    const transaction = await flowService.grantXP(recipientAddress, amount);
 
     return c.json({
       success: true,
@@ -722,15 +704,14 @@ app.post('/api/transactions/unlock-skill', async (c) => {
     }
 
     const transactionCode = `
-      import ClandestineNetwork from 0x2444e6b4d9327f09
-      import SkillRegistry from 0x2444e6b4d9327f09
+      ${generateImports(['CLANDESTINE_NETWORK', 'SKILL_REGISTRY'])}
 
       transaction(skillID: String) {
-        let emisarioRef: &ClandestineNetwork.Emisario
+        let emisarioRef: &${contractName}.Emisario
         let skillData: SkillRegistry.SkillData
 
         prepare(signer: auth(Storage) &Account) {
-          self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
+          self.emisarioRef = signer.storage.borrow<&${contractName}.Emisario>(from: ${STORAGE_PATHS.EMISARIO_STORAGE})
             ?? panic("Emisario resource not found. Please run setup_account.cdc")
 
           self.skillData = SkillRegistry.getSkillData(skillID: skillID)

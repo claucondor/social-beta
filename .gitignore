@@ -2,3 +2,4 @@ flow.json
 emulator-account.pkey
 flow.private.json 
 node_modules
+setup_secrets.sh

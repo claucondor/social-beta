@@ -25,7 +25,7 @@ interface AuthStore {
   initialize: () => Promise<void>;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  registerUser: (displayName?: string) => Promise<boolean>;
+  registerUser: (displayName?: string, country?: string) => Promise<boolean>;
   updateUser: (userData: Partial<User>) => void;
   checkUserStatus: (address: string) => Promise<void>;
 }
@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  registerUser: async (displayName?: string) => {
+  registerUser: async (displayName?: string, country?: string) => {
     const { user } = get();
     if (!user?.address) {
       console.error('No user address found');
@@ -111,7 +111,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       console.log('Starting user registration process...');
       
       // Use FlowService to register the user on-chain
-      const success = await FlowService.registerUser(displayName);
+      const success = await FlowService.registerUser(displayName, country);
       
       if (success) {
         console.log('Registration successful, checking user status...');

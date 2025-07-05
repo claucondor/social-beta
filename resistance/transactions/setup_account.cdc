@@ -6,42 +6,40 @@
 // 2. Collection: An NFT collection to hold the "ClaimTicket" NFTs, which prove
 //    co-ownership of a Vinculo.
 
-import "NonFungibleToken"
-import "ClandestineNetwork"
+import ClandestineNetworkV2 from 0x2444e6b4d9327f09
+import NonFungibleToken from 0x631e88ae7f1d7c20
 
 transaction {
 
     prepare(signer: auth(Storage, Capabilities) &Account) {
-
-        // 1. Set up the Emisario resource if it doesn't exist
-        if signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath) == nil {
-            let emisario <- ClandestineNetwork.createEmisario()
-            signer.storage.save(<-emisario, to: ClandestineNetwork.EmisarioStoragePath)
+        // Use specific paths for V2 to avoid collisions
+        let emisarioStoragePath = /storage/ClandestineEmisarioV2
+        let emisarioPublicPath = /public/ClandestineEmisarioV2
+        let claimCollectionStoragePath = /storage/ClandestineClaimCollectionV2
+        let claimCollectionPublicPath = /public/ClandestineClaimCollectionV2
+        
+        // Create new Emisario V2
+        let newEmisario <- ClandestineNetworkV2.createEmisario()
+        
+        // Store it in the account using V2 path
+        signer.storage.save(<-newEmisario, to: emisarioStoragePath)
+        
+        // Create a public capability for the Emisario
+        let emisarioPublicCap = signer.capabilities.storage.issue<&{ClandestineNetworkV2.EmisarioPublic}>(emisarioStoragePath)
+        signer.capabilities.publish(emisarioPublicCap, at: emisarioPublicPath)
+        
+        // Create ClaimTicket collection if it doesn't exist
+        if signer.storage.borrow<&ClandestineNetworkV2.Collection>(from: claimCollectionStoragePath) == nil {
+            let collection <- ClandestineNetworkV2.createEmptyCollection()
+            signer.storage.save(<-collection, to: claimCollectionStoragePath)
             
-            // Note: We are not creating a public capability for the Emisario resource
-            // to keep player progression private by default. Scripts can read this
-            // data from the owner's account directly if authorized.
-            log("Emisario resource created and saved.")
-        } else {
-            log("Emisario resource already exists.")
-        }
-
-        // 2. Set up the ClaimTicket NFT Collection if it doesn't exist
-        if signer.storage.borrow<&ClandestineNetwork.Collection>(from: ClandestineNetwork.ClaimCollectionStoragePath) == nil {
-            let collection <- ClandestineNetwork.createEmptyCollection()
-            signer.storage.save(<-collection, to: ClandestineNetwork.ClaimCollectionStoragePath)
-
-            // Create a public capability for the collection.
-            let cap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionStoragePath)
-            signer.capabilities.publish(cap, at: ClandestineNetwork.ClaimCollectionPublicPath)
-            
-            log("ClaimTicket NFT Collection created and capability published.")
-        } else {
-            log("ClaimTicket NFT Collection already exists.")
+            // Create a public capability for the collection
+            let collectionCap = signer.capabilities.storage.issue<&{NonFungibleToken.Collection}>(claimCollectionStoragePath)
+            signer.capabilities.publish(collectionCap, at: claimCollectionPublicPath)
         }
     }
 
     execute {
-        log("Account setup for the Clandestine Network is complete.")
+        log("Account setup completed successfully")
     }
 } 

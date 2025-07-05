@@ -4,41 +4,31 @@
 // by calling the ClandestineNetwork contract. It then distributes the two
 // resulting ClaimTicket NFTs to the respective owners.
 
-import "NonFungibleToken"
-import "ClandestineNetwork"
+import ClandestineNetworkV2 from 0x2444e6b4d9327f09
+import NonFungibleToken from 0x631e88ae7f1d7c20
 
 transaction(partnerAddress: Address) {
 
     // The Emisario resource of the transaction signer (the initiator)
-    let initiatorEmisarioRef: &ClandestineNetwork.Emisario
+    let initiatorEmisarioRef: &ClandestineNetworkV2.Emisario
     
     // The NFT Collection for ClaimTickets of the transaction signer
-    let initiatorCollectionRef: &{NonFungibleToken.Collection}
+    let initiatorCollectionRef: &ClandestineNetworkV2.Collection
 
-    // The public capability to the partner's ClaimTicket Collection
-    let partnerCollectionCap: Capability<&{NonFungibleToken.Collection}>
-
-    prepare(initiator: auth(Storage, Capabilities) &Account) {
+    prepare(signer: auth(Storage) &Account) {
         // --- Initiator Setup ---
-        self.initiatorEmisarioRef = initiator.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-            ?? panic("Initiator's Emisario resource not found. Please run setup_account.cdc")
+        self.initiatorCollectionRef = signer.storage.borrow<&ClandestineNetworkV2.Collection>(from: /storage/ClandestineClaimCollectionV2)
+            ?? panic("Initiator does not have a ClaimTicket collection.")
 
-        self.initiatorCollectionRef = initiator.storage.borrow<&{NonFungibleToken.Collection}>(from: ClandestineNetwork.ClaimCollectionStoragePath)
-            ?? panic("Initiator's ClaimTicket Collection not found. Please run setup_account.cdc")
-
-        // --- Partner Setup ---
-        self.partnerCollectionCap = getAccount(partnerAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
-        
-        if !self.partnerCollectionCap.check() {
-            panic("Partner's ClaimTicket Collection capability is not valid or has not been published.")
-        }
+        self.initiatorEmisarioRef = signer.storage.borrow<&ClandestineNetworkV2.Emisario>(from: /storage/ClandestineEmisarioV2)
+            ?? panic("Initiator does not have an Emisario resource.")
     }
 
     execute {
         // --- Forge the Bond using the simplified version ---
-        let tickets <- ClandestineNetwork.forgeBondSimple(
+        let tickets <- ClandestineNetworkV2.forgeBondSimple(
             emisario1: self.initiatorEmisarioRef,
-            owner1: self.initiatorEmisarioRef.owner!.address,
+            owner1: self.initiatorCollectionRef.owner!.address,
             owner2: partnerAddress
         )
 
@@ -47,7 +37,8 @@ transaction(partnerAddress: Address) {
         // --- Distribute the Claim Tickets ---
         
         // Deposit the partner's ticket
-        let partnerCollection = self.partnerCollectionCap.borrow()
+        let partnerAccount = getAccount(partnerAddress)
+        let partnerCollection = partnerAccount.capabilities.get<&{NonFungibleToken.Collection}>(/public/ClandestineClaimCollectionV2).borrow()
             ?? panic("Could not borrow partner's collection.")
         partnerCollection.deposit(token: <- tickets.removeFirst())
         log("Deposited Claim Ticket in partner's collection.")

@@ -4,15 +4,15 @@
 // associated with their Emisario resource. This key is then used by others
 // to encrypt messages sent to this user.
 
-import "ClandestineNetwork"
+import ClandestineNetworkV2 from 0x2444e6b4d9327f09
 
 transaction(newPublicKey: String) {
 
-    let emisarioRef: &ClandestineNetwork.Emisario
+    let emisarioRef: &ClandestineNetworkV2.Emisario
 
     prepare(signer: auth(Storage) &Account) {
-        self.emisarioRef = signer.storage.borrow<&ClandestineNetwork.Emisario>(from: ClandestineNetwork.EmisarioStoragePath)
-            ?? panic("Emisario resource not found. Please run setup_account.cdc")
+        self.emisarioRef = signer.storage.borrow<&ClandestineNetworkV2.Emisario>(from: /storage/ClandestineEmisarioV2)
+            ?? panic("Emisario resource not found. Please run setup_account.cdc first")
     }
 
     execute {

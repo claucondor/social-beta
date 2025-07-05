@@ -3,48 +3,40 @@
 // This script reads all the "ClaimTicket" NFTs from a user's collection
 // and, for each ticket, fetches the details of the Vinculo it represents.
 
-import "NonFungibleToken"
-import "ClandestineNetwork"
+import ClandestineNetworkV2 from 0x2444e6b4d9327f09
+import NonFungibleToken from 0x631e88ae7f1d7c20
 
 access(all) fun main(userAddress: Address): [{String: AnyStruct}] {
-    
     let result: [{String: AnyStruct}] = []
+    let account = getAccount(userAddress)
     
-    // Get the public capability for the user's ClaimTicket Collection.
-    let collectionCap = getAccount(userAddress).capabilities.get<&{NonFungibleToken.Collection}>(ClandestineNetwork.ClaimCollectionPublicPath)
+    if let collectionRef = account.capabilities.get<&{NonFungibleToken.Collection}>(/public/ClandestineClaimCollectionV2).borrow() {
+        let claimTicketIDs = collectionRef.getIDs()
 
-    if !collectionCap.check() {
-        // If the capability doesn't exist or is invalid, return an empty array.
-        return result
-    }
+        // Iterate through each ClaimTicket ID in the user's collection.
+        for id in claimTicketIDs {
+            // Borrow the NFT to get its details, specifically the bondID.
+            let claimTicket = collectionRef.borrowNFT(id) as! &ClandestineNetworkV2.ClaimTicket
 
-    let collection = collectionCap.borrow()!
-    let claimTicketIDs = collection.getIDs()
+            // Use the bondID from the ticket to fetch the actual Vinculo details.
+            let bondDetails = ClandestineNetworkV2.borrowVinculo(id: claimTicket.bondID)
 
-    // Iterate through each ClaimTicket ID in the user's collection.
-    for id in claimTicketIDs {
-        // Borrow the NFT to get its details, specifically the bondID.
-        let claimTicket = collection.borrowNFT(id: id) as! &ClandestineNetwork.ClaimTicket
-
-        // Use the bondID from the ticket to fetch the actual Vinculo details.
-        let bondDetails = ClandestineNetwork.borrowVinculo(id: claimTicket.bondID)
-
-        if let bond = bondDetails {
-            // If the bond exists, add its details to our result array.
-            let bondInfo = {
-                "id": bond.id,
-                "owners": bond.owners,
-                "emisarioIDs": bond.emisarioIDs,
-                "messagesExchanged": bond.messagesExchanged,
-                "bondLevel": bond.bondLevel,
-                "bondPoints": bond.bondPoints,
-                "status": bond.status,
-                "artSeed": bond.artSeed,
-                "colorPaletteSeed": bond.colorPaletteSeed,
-                "patternComplexitySeed": bond.patternComplexitySeed,
-                "codexURI": bond.codexURI
+            if let bond = bondDetails {
+                let bondInfo = {
+                    "bondID": bond.id,
+                    "owners": bond.owners,
+                    "emisarioIDs": bond.emisarioIDs,
+                    "messagesExchanged": bond.messagesExchanged,
+                    "bondLevel": bond.bondLevel,
+                    "bondPoints": bond.bondPoints,
+                    "status": bond.status,
+                    "artSeed": bond.artSeed,
+                    "colorPaletteSeed": bond.colorPaletteSeed,
+                    "patternComplexitySeed": bond.patternComplexitySeed,
+                    "codexURI": bond.codexURI
+                }
+                result.append(bondInfo)
             }
-            result.append(bondInfo)
         }
     }
 
