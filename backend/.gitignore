@@ -95,6 +95,9 @@ jspm_packages/
 .flow/
 flow.json
 
+# Sensitive scripts
+setup_secrets.sh
+
 # Database
 *.db
 *.sqlite
